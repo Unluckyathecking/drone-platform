@@ -40,6 +40,7 @@ def _parse_coord(s: str) -> Coordinate:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Parse CLI arguments, build a mission, write waypoints, and optionally upload."""
     parser = argparse.ArgumentParser(
         description="Mission Planning Engine — generate ArduPilot waypoint files",
     )
