@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mission-planning-engine"
+version = "0.1.0"
+description = "Autonomous mission planner for ArduPilot fixed-wing UAVs"
+requires-python = ">=3.11"
+dependencies = [
+    "pymavlink>=2.4.40",
+    "pydantic>=2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov",
+]
+
+[project.scripts]
+mpe = "mpe.cli:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -1,0 +1,74 @@
+# Skywalker X8 — SITL Parameter File
+# Tuned for high-efficiency glider-style flight
+# Load in MAVProxy: param load params/skywalker_x8.parm
+# Or in SITL startup: --add-param-file params/skywalker_x8.parm
+
+# ── Airspeed ──────────────────────────────────────────────
+# X8 cruises at ~60-70 km/h, stalls around 40 km/h
+TRIM_ARSPD_CM       1800    # Target cruise: 18 m/s (65 km/h)
+ARSPD_FBW_MIN       1100    # Min flyable: 11 m/s (40 km/h)
+ARSPD_FBW_MAX       2800    # Max (Vne): 28 m/s (100 km/h)
+AIRSPEED_MIN         11     # Minimum airspeed for auto modes
+AIRSPEED_MAX         28     # Maximum airspeed
+AIRSPEED_CRUISE      18     # Cruise airspeed target
+
+# ── Roll / Bank Limits ────────────────────────────────────
+# Flying wing — keep bank angles moderate for stability
+LIM_ROLL_CD          3500   # Max bank: 35° (gentle turns)
+ROLL_LIMIT_DEG       35     # Same as above in degrees
+
+# ── Pitch Limits ──────────────────────────────────────────
+LIM_PITCH_MAX        2000   # Max pitch up: 20°
+LIM_PITCH_MIN       -1500   # Max pitch down: -15°
+
+# ── Navigation ────────────────────────────────────────────
+# Wider turns, smoother flight path — glider behavior
+NAVL1_PERIOD         20     # L1 navigation period (higher = wider turns)
+NAVL1_DAMPING        0.75   # Navigation damping
+WP_RADIUS            40     # Waypoint acceptance radius: 40m
+WP_LOITER_RAD        80     # Default loiter orbit radius: 80m
+
+# ── Throttle / TECS ──────────────────────────────────────
+# TECS (Total Energy Control System) manages speed vs altitude
+THR_MAX              75     # Max throttle: 75% (efficient cruising, not full power)
+THR_MIN              0      # Allow full glide (0% throttle)
+TECS_CLMB_MAX        3.0   # Max climb rate: 3 m/s (gentle)
+TECS_SINK_MIN         1.0  # Min sink rate: 1 m/s (efficient glide)
+TECS_SINK_MAX         3.0  # Max sink rate: 3 m/s
+TECS_SPDWEIGHT        1.0  # Balance speed vs altitude control
+TECS_TIME_CONST       7.0  # TECS time constant (higher = smoother, slower response)
+
+# ── Takeoff ───────────────────────────────────────────────
+TKOFF_THR_MAX        100    # Full throttle on takeoff
+TKOFF_THR_MINACC     15     # Min acceleration to detect launch (hand throw)
+TKOFF_THR_DELAY      2      # Throttle delay after launch detect (seconds)
+TKOFF_ALT            30     # Takeoff complete altitude: 30m
+
+# ── Landing ───────────────────────────────────────────────
+LAND_FLARE_ALT       5      # Begin flare at 5m AGL
+LAND_FLARE_SEC       2      # Flare duration
+TECS_LAND_ARSPD      13     # Approach airspeed: 13 m/s (47 km/h)
+TECS_LAND_SPDWGT     1.0   # Prioritize speed control on approach
+
+# ── Failsafes ────────────────────────────────────────────
+FS_SHORT_ACTN        0      # Short comms loss: circle
+FS_SHORT_TIMEOUT     5      # 5 seconds before short failsafe
+FS_LONG_ACTN         1      # Long comms loss: RTL
+FS_LONG_TIMEOUT      20     # 20 seconds before RTL
+BATT_FS_LOW_ACT      1      # Low battery: RTL
+BATT_FS_CRT_ACT      3      # Critical battery: land immediately
+THR_FAILSAFE         1      # RC loss failsafe: enabled
+
+# ── Geofence ─────────────────────────────────────────────
+FENCE_ENABLE         1      # Geofence on
+FENCE_ACTION         1      # Breach action: RTL
+FENCE_ALT_MAX        120    # Max altitude: 120m (UK CAA Open A3)
+FENCE_ALT_MIN        10     # Min altitude: 10m AGL (safety floor)
+FENCE_RET_ALT        50     # Return altitude after breach: 50m
+
+# ── RTL (Return to Launch) ───────────────────────────────
+RTL_ALTITUDE         50     # RTL altitude: 50m
+RTL_AUTOLAND         2      # Auto-land after RTL loiter
+
+# ── Stall Prevention ─────────────────────────────────────
+STALL_PREVENTION     1      # Enable stall prevention
