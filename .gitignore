@@ -31,3 +31,10 @@ terrain/
 
 # Claude Code
 .claude/
+
+# Environment secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
