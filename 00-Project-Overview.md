@@ -57,6 +57,19 @@ Build a **multipurpose autonomous fixed-wing drone platform** with hotswappable 
 - **Efficiency over speed** — glider-like aerodynamics for endurance
 - **Open-source stack** — ArduPilot, Python, pymavlink
 
+## Platform Family Vision
+
+The MINI tier (Skywalker X8) is the first in a family of four scale classes sharing common design philosophy, mission engine, and payload interface:
+
+```
+  MICRO (500g)  →  MINI (5-15kg)  →  MEDIUM (25-50kg)  →  LARGE (100-200kg)
+  swarm/decoy      ★ current build   loiter munition      persistent comms
+  disposable       multirole          ASW/sonar            relay constellation
+                                      cargo heavy          solar-assisted
+```
+
+See [22-Multi-Scale-Platform-Family](22-Multi-Scale-Platform-Family.md) for full concept including high-altitude comms relay constellation and counter-mine applications.
+
 ## Notes Index
 
 | File | Contents |
@@ -70,6 +83,8 @@ Build a **multipurpose autonomous fixed-wing drone platform** with hotswappable 
 | [07-Mission-Engine-Architecture](07-Mission-Engine-Architecture.md) | Mission engine design, data models, MAVLink integration |
 | [08-Payload-System-Design](08-Payload-System-Design.md) | Hotswap interface, payload modules, CG management |
 | [09-UK-Regulations-and-Test-Sites](09-UK-Regulations-and-Test-Sites.md) | CAA licensing, test sites, BVLOS path |
+| [10-21] | Deep dive research documents (sensors, military, naval, pest control) |
+| [22-Multi-Scale-Platform-Family](22-Multi-Scale-Platform-Family.md) | 4-tier platform family, comms relay constellation, counter-mine concept |
 
 ## Immediate Next Steps
 
