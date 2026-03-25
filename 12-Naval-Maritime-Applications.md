@@ -50,16 +50,16 @@ Sonobuoys are expendable acoustic sensors dropped from aircraft into the ocean. 
 
 | Designator | Type | Function | Weight | Dimensions | Depth | Endurance |
 |---|---|---|---|---|---|---|
-| AN/SSQ-36 (BT) | Passive | Bathythermograph — measures water temperature profile to calibrate other buoys | 5.0 kg | A-size (124 mm dia × 914 mm) | Variable | Single measurement |
+| AN/SSQ-36 (BT) | Passive | Bathythermograph — measures water temperature profile to calibrate other buoys | 5.0 kg | A-size (124 mm dia x 914 mm) | Variable | Single measurement |
 | AN/SSQ-53 (DIFAR) | Passive | Directional frequency analysis and recording — primary passive detection buoy | 4.5 kg | A-size | 27–305 m selectable | 1, 2, 4, or 8 hours |
 | AN/SSQ-62 (DICASS) | Active | Directional command-activated sonobuoy system — active ping on command | 5.5 kg | A-size | 27–457 m | 30 min to 8 hours |
-| AN/SSQ-101 (ADAR) | Passive | Advanced deployable acoustic receiver — multi-element array | ~15 kg | A-size (×2 length) | Deep | Hours |
+| AN/SSQ-101 (ADAR) | Passive | Advanced deployable acoustic receiver — multi-element array | ~15 kg | A-size (x2 length) | Deep | Hours |
 
 ### Can a Mini-UAV Carry One?
 
 **The honest answer: barely, and only the lightest variants.**
 
-A standard AN/SSQ-53 at 4.5 kg exceeds the 4 kg payload limit. Even if you shaved to exactly 4 kg, the buoy's A-size form factor (124 mm × 914 mm — nearly a meter long) creates severe integration problems for a 2–4 m wingspan airframe. The buoy would need to be carried externally or in a belly bay, significantly affecting aerodynamics.
+A standard AN/SSQ-53 at 4.5 kg exceeds the 4 kg payload limit. Even if you shaved to exactly 4 kg, the buoy's A-size form factor (124 mm x 914 mm — nearly a meter long) creates severe integration problems for a 2–4 m wingspan airframe. The buoy would need to be carried externally or in a belly bay, significantly affecting aerodynamics.
 
 **More importantly:** a single sonobuoy is operationally useless for ASW. Submarine localization requires deploying a *pattern* of buoys — typically 6–12 or more in a barrier or cross pattern — so a single-buoy-per-sortie platform has extremely limited tactical value.
 
@@ -73,7 +73,7 @@ The real opportunity is in miniature acoustic sensors:
 | **Thales Compact Sonobuoy** | ~2.5 kg | Designed for smaller platforms |
 | **DARPA DASH (Distributed Agile Submarine Hunting)** | ~1–2 kg | Concept for networked mini-buoys deployed by drones |
 | **Custom miniature hydrophone buoy** | 0.5–1.5 kg | Commercial hydrophone (e.g., Cetacean Research C75) + VHF transmitter + float + battery. DIY deployable |
-| **RSAqua "Sono.Micro"** concept | ~1 kg | Academic/startup miniature acoustic buoy designs |
+| **RSAqua "Sono.Micro" concept** | ~1 kg | Academic/startup miniature acoustic buoy designs |
 
 With a 4 kg payload, you could carry 2–4 miniature (1 kg) acoustic buoys and deploy them in a pattern across multiple passes or sorties.
 
@@ -92,7 +92,7 @@ With a 4 kg payload, you could carry 2–4 miniature (1 kg) acoustic buoys and d
 
 ### Reference: MQ-8 Fire Scout
 
-The MQ-8B/C Fire Scout (unmanned helicopter, 1400 kg MTOW, ~270 kg payload) has been tested for sonobuoy deployment by the US Navy. It carries a rotary launcher with multiple A-size buoys. This is a platform 100× the size and cost of a mini fixed-wing — which illustrates the scale mismatch. The Navy is also exploring the MQ-9B SeaGuardian (5 tonnes+) for ASW.
+The MQ-8B/C Fire Scout (unmanned helicopter, 1400 kg MTOW, ~270 kg payload) has been tested for sonobuoy deployment by the US Navy. It carries a rotary launcher with multiple A-size buoys. This is a platform 100x the size and cost of a mini fixed-wing — which illustrates the scale mismatch. The Navy is also exploring the MQ-9B SeaGuardian (5 tonnes+) for ASW.
 
 ### Feasibility: LOW to MODERATE
 
@@ -114,7 +114,7 @@ Rather than traditional sonobuoys, deploy compact sonar devices from the UAV —
 | Device | Type | Weight | Detection | Price | Notes |
 |---|---|---|---|---|---|
 | **Blue Robotics Ping Sonar** | Single-beam echosounder | 44 g (in-water) | 30 m range, 300 m depth | ~$280 | Designed for ROVs. Needs waterproof housing + battery + data link for autonomous buoy use |
-| **Blue Robotics Ping360** | Scanning sonar (mechanical) | 310 g (in-water) | 50 m range, 360° | ~$2500 | Excellent for sub-surface object detection. Would need float + battery + radio = ~1.5 kg total buoy |
+| **Blue Robotics Ping360** | Scanning sonar (mechanical) | 310 g (in-water) | 50 m range, 360 deg | ~$2500 | Excellent for sub-surface object detection. Would need float + battery + radio = ~1.5 kg total buoy |
 | **Imagenex 852** | Miniature side-scan | ~2 kg (in-air) | 120 m swath | ~$8000 | Compact side-scan head. Designed for small AUVs/ROVs |
 | **EchoPilot FLS** | Forward-looking sonar | ~1 kg | 60 m ahead | ~$3000 | Designed for vessel navigation, could be repurposed |
 | **Humminbird HELIX (transducer only)** | Chirp sonar | ~0.5 kg | 30–60 m | ~$200 | Consumer fish-finder transducer; cheap, proven, hackable |
@@ -166,7 +166,7 @@ Deploying miniature sonar buoys is technically achievable. The main challenges a
 - Fly lawnmower pattern at 5–15 m altitude over affected water body.
 - Dispense liquid treatment in calibrated spray.
 - Coverage rate depends on swath width (2–5 m at low altitude) and flight speed.
-- For a small lake (1 km²), multiple sorties would be needed.
+- For a small lake (1 km2), multiple sorties would be needed.
 
 **Existing operators:**
 - **Rantizo** — agricultural drone spraying (primarily multirotor).
@@ -269,7 +269,7 @@ Deploying miniature sonar buoys is technically achievable. The main challenges a
 
 **Concept:** Deploy small floating sensor packages (GPS + temperature + salinity + accelerometer + satellite or LoRa uplink) to track ocean currents, monitor marine protected areas, or create virtual fences.
 
-**Payload:** 200–500 g per sensor pod × 4–8 pods = 1.0–4.0 kg.
+**Payload:** 200–500 g per sensor pod x 4–8 pods = 1.0–4.0 kg.
 
 **Reference:** Pacific Gyre "SPOT" drifters, Sofar Ocean "Spotter" buoys (though these are larger). Custom lightweight drifters can be built for ~$100–200 each using ESP32 + GPS + LoRa + solar cell + waterproof housing.
 
@@ -298,7 +298,7 @@ With remaining payload capacity (2.5–3.5 kg after sensors), the UAV could carr
 | Inflatable life jacket (manual) | ~0.5 kg | Compact when packed |
 | Personal locator beacon (PLB) | ~0.2 kg | ACR ResQLink or similar |
 | Waterproof VHF radio | ~0.3 kg | Standard marine handheld |
-| Chemical light sticks (×4) | ~0.2 kg | Visibility at night |
+| Chemical light sticks (x4) | ~0.2 kg | Visibility at night |
 | Survival blanket | ~0.1 kg | Space blanket type |
 | **Total supply package** | **~1.3 kg** | Easily within budget |
 
