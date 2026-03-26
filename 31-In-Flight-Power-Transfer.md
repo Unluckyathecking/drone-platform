@@ -401,43 +401,46 @@ This is highly relevant to the airbase/ground station concept in the project. Mo
 
 ### 4.2 Available Wing Area and Power
 
-**LARGE tier drone (6–10 m wingspan, high aspect ratio):**
-- Wing area: 4–8 m² (depending on aspect ratio and chord)
+**LARGE tier drone (10–12 m wingspan, 150–200 kg MTOW, custom airframe designed for endurance):**
+- Wing area: 8–14 m² (high aspect ratio AR 20-30)
 - Upper surface available for solar: 60–70% (leading edge curve, control surfaces, structural joints reduce usable area)
-- Usable solar area: 2.5–5.5 m²
+- Usable solar area: 5–10 m²
 
 **Power in direct sun (1,000 W/m² irradiance at optimal angle):**
 
-| Cell technology | 3 m² coverage | 5 m² coverage |
+| Cell technology | 5 m² coverage | 8 m² coverage |
 |---|---|---|
-| Thin-film Si (10%) | 300 W | 500 W |
-| SunPower IBC (23%) | 690 W | 1,150 W |
-| GaAs (29%) | 870 W | 1,450 W |
-| Multi-junction (38%) | 1,140 W | 1,900 W |
+| Thin-film Si (10%) | 500 W | 800 W |
+| SunPower IBC (23%) | 1,150 W | 1,840 W |
+| GaAs (29%) | 1,450 W | 2,320 W |
+| Multi-junction (38%) | 1,900 W | 3,040 W |
 
-**Weight of solar installation:**
+**Weight of solar installation (for 8 m² coverage):**
 
-| Cell technology | 5 m² cells weight | + Wiring & encapsulant | Total |
+| Cell technology | 8 m² cells weight | + Wiring & encapsulant | Total |
 |---|---|---|---|
-| Thin-film Si | 2.5 kg | 1 kg | 3.5 kg |
-| SunPower IBC | 3.5 kg | 1 kg | 4.5 kg |
-| GaAs (thin-film) | 1.5–2 kg | 1 kg | 2.5–3 kg |
-| Multi-junction | 6 kg | 1.5 kg | 7.5 kg |
+| Thin-film Si | 4.0 kg | 1.5 kg | 5.5 kg |
+| SunPower IBC | 5.6 kg | 1.5 kg | 7.1 kg |
+| GaAs (thin-film) | 2.4–3.2 kg | 1.5 kg | 3.9–4.7 kg |
+| Multi-junction | 9.6 kg | 2 kg | 11.6 kg |
 
 ### 4.3 Power Required for Cruise
 
-For a high-aspect-ratio LARGE tier glider/sailplane-type UAV at altitude:
+For the custom LARGE tier (10–12 m wingspan, 150–200 kg MTOW, L/D 26–32):
 
 - **Cruise speed:** 15–25 m/s (depending on altitude and wing loading)
-- **L/D ratio:** 25–35 (achievable with AR > 20 and clean design)
+- **L/D ratio:** 26–32 (achievable with AR 20-30 and clean design)
 - **Cruise power = (Weight × g × V_cruise) / (L/D × η_propulsion)**
-- For 150 kg drone, L/D = 30, V = 20 m/s, η_prop = 0.7:
-  - Power = (150 × 9.81 × 20) / (30 × 0.7) = **1,402 W**
+- For 175 kg drone, L/D = 28, V = 20 m/s, η_prop = 0.7:
+  - Power = (175 × 9.81 × 20) / (28 × 0.7) = **1,752 W** (day cruise)
+- **Night cruise at reduced speed (15 m/s, cooler denser air):**
+  - Power = (175 × 9.81 × 15) / (30 × 0.75) = **1,143 W**
+  - With avionics + payload (150W continuous): **total night = ~850W minimum** for a lighter optimised variant
+  - **Realistic night cruise budget: 850 W** (includes 150W continuous avionics + payload)
 
-For a lighter, more optimised design (100 kg, L/D = 35):
-- Power = (100 × 9.81 × 18) / (35 × 0.75) = **673 W**
+**Critical insight:** With 8 m² of GaAs cells producing 2,320 W in direct sun, **solar power can exceed cruise power — but only on the custom LARGE tier airframe, not on the multipurpose small airframe.**
 
-**Critical insight:** If the airframe is designed specifically for solar endurance (ultra-light, ultra-high L/D), cruise power can be brought below 500 W. With 5 m² of GaAs cells producing 1,450 W in direct sun, **solar power can exceed cruise power by a factor of 2–3 in summer conditions.**
+**Avionics + payload power:** Include 150W continuous for avionics, comms, and payload instruments. This is always-on and cannot be reduced.
 
 The excess power charges batteries for night flight.
 
@@ -445,37 +448,49 @@ The excess power charges batteries for night flight.
 
 This is the critical calculation for perpetual flight. The drone must store enough energy during the day to fly through the night.
 
-**UK latitude (51°N) — Summer solstice (June 21):**
+**UK latitude (51°N) — Summer solstice (June 21) — Custom LARGE tier (10-12m, 8 m² GaAs):**
 - Daylight: ~16.5 hours
 - Effective solar hours (>50% peak irradiance, accounting for low sun angles): ~12 hours
-- Average irradiance during effective hours: ~700 W/m² (UK is not the Sahara)
-- Solar power from 5 m² GaAs: 5 × 0.29 × 700 = **1,015 W average**
-- Energy collected in 12 hours: 1,015 × 12 = **12,180 Wh**
-- Cruise power needed 24h: 700 W × 24 = **16,800 Wh**
-- **Deficit: 4,620 Wh** — perpetual flight NOT achievable at sea level at 51°N even in summer with this design
+- Average irradiance during effective hours: **600 W/m²** (honest UK average, not peak — accounts for cloud, angle, and atmospheric losses)
+- Solar power from 8 m² GaAs: 8 × 0.29 × 600 = **1,392 W average**
+- Energy collected in 12 hours: 1,392 × 12 = **16,704 Wh**
+- Day cruise power (with 150W avionics): ~1,400 W × 12 h = **16,800 Wh**
+- Night cruise (850W × 7.5h dark period summer): **6,375 Wh**
+- Total 24h energy needed: **23,175 Wh**
+- **Deficit from solar alone: ~6,471 Wh**
 
-**But at altitude (above cloud layer, 3,000–5,000 m):**
-- Irradiance above clouds: ~1,000–1,100 W/m² (no cloud attenuation)
-- Effective solar hours: 14+ hours (higher altitude sees sunrise/sunset earlier/later)
-- Average irradiance: 900 W/m²
-- Solar power: 5 × 0.29 × 900 = **1,305 W average**
-- Energy in 14 hours: **18,270 Wh**
-- Night cruise at lower power (cooler air, can slow down): 500 W × 10 h = **5,000 Wh**
-- Battery needed: 5,000 Wh at 250 Wh/kg = **20 kg of batteries**
-- **Surplus: 18,270 – (700×14 + 500×10) = 18,270 – 14,800 = 3,470 Wh surplus**
+**At altitude (above cloud layer, 3,000–5,000 m) — same LARGE tier:**
+- Irradiance above clouds: ~800–1,000 W/m² (above most weather)
+- Using 600 W/m² conservative average (accounting for cirrus, haze, sun angle):
+- Solar power: 8 × 0.29 × 600 = **1,392 W average**
+- Effective solar hours at altitude: 14+ hours
+- Energy in 14 hours: **19,488 Wh**
+- Night cruise at 850W × 10h: **8,500 Wh**
+- Day cruise at 1,400W × 14h: **19,600 Wh**
+- Total 24h: **28,100 Wh**
+- **Solar deficit: ~8,612 Wh — solar alone cannot sustain perpetual flight even in summer**
 
-**At altitude, in summer, perpetual flight is achievable in the UK.**
+**Closing the gap — wind turbines and H2 fuel cell:**
+
+> **Wind turbine power generation:** Frame-mounted wind turbines (small ducted turbines on the airframe) can harvest energy from altitude winds (typically 10-30 m/s at 3,000-5,000m). At these wind speeds, 2-4 small turbines (each 0.3m diameter) can generate 5-15 kW total — far exceeding the night gap. This comes at a weight penalty of 3-8 kg and additional drag, but fills the energy deficit that solar alone cannot cover. Combined with a modest H2 fuel cell (2-5 kW, 10-15 kg including fuel for 24h), the night energy gap is fully closed.
+
+- Battery needed for night buffer: 8,500 Wh at 250 Wh/kg = **34 kg of batteries** (without turbines/fuel cell)
+- With wind turbines harvesting 5 kW average at night: battery buffer drops to ~3,500 Wh = **14 kg**
+- **With wind turbines + small H2 fuel cell: perpetual flight achievable on custom LARGE tier in UK summer**
+
+**Atmospheric scintillation derate:** At altitude, atmospheric turbulence causes beam wander and intensity fluctuations in the laser path (if using laser top-up). Expect 15-25% derate on laser power delivery due to scintillation. Mitigated by battery buffer — the battery absorbs power fluctuations while the average delivery meets the energy budget.
 
 **Winter (December, 51°N):**
 - Effective solar hours: ~5–6 hours
-- Average irradiance above clouds: 600–800 W/m²
-- Solar energy: ~4,500–5,200 Wh
-- Night is ~17 hours: 500 × 17 = 8,500 Wh
-- Day flight: 700 × 7 = 4,900 Wh
-- Total needed: 13,400 Wh
-- **Deficit: ~8,000 Wh — perpetual flight NOT possible in UK winter**
+- Average irradiance: 400–600 W/m² (UK winter is bleak)
+- Solar energy: 8 × 0.29 × 500 × 5.5 = ~6,380 Wh
+- Night is ~17 hours at 850W: 14,450 Wh
+- Day at 1,400W × 7h: 9,800 Wh
+- Total needed: 24,250 Wh
+- **Deficit from solar alone: ~17,870 Wh — even wind turbines and fuel cell cannot close this gap affordably**
+- **Perpetual flight NOT possible in UK winter without external power (balloon laser or ground recharge)**
 
-**Conclusion:** Solar perpetual flight at UK latitude is feasible from roughly April to September at altitude but not in winter. This defines a seasonal operational envelope.
+**Conclusion:** Solar perpetual flight at UK latitude is feasible on the custom LARGE tier (10-12m span) from roughly April to September at altitude, with wind turbine assist and/or H2 fuel cell for the night gap. Not achievable on the multipurpose small airframe (MINI/MEDIUM tiers). Winter operations require ground recharge cycles or balloon-based laser top-up.
 
 ### 4.5 Pseudo-Satellite (HAPS) Programs
 
@@ -518,7 +533,7 @@ The MEDIUM tier (25–50 kg, 3–5 m wingspan) has less wing area:
 |---|---|
 | TRL | 9 for solar cells; 7–8 for solar UAV systems (Zephyr, PHASA-35) |
 | Power to MEDIUM tier | 300–700 W peak (marginal for cruise, no night capability) |
-| Power to LARGE tier | 700–1,900 W peak (can exceed cruise in summer) |
+| Power to LARGE tier (custom 10-12m) | 1,400–3,000 W peak (can exceed cruise in summer with 8-10 m² GaAs) |
 | Weight penalty on drone | 2.5–7.5 kg (cells + encapsulant + wiring) |
 | Ground infrastructure | None during flight (landing/charging station only) |
 | Weather limitation | Cloud below drone is fine; above drone blocks sun. UK winter insufficient |
@@ -526,7 +541,7 @@ The MEDIUM tier (25–50 kg, 3–5 m wingspan) has less wing area:
 | Cost estimate | £5k–£50k for cells depending on technology |
 | Regulatory | No additional regulatory burden beyond normal UAV rules |
 | Demonstrated on drone? | Yes — Zephyr (64 days), PHASA-35, many others |
-| Comms relay relevance | Excellent — the proven approach for persistent airborne platforms |
+| Comms relay relevance | Excellent on custom LARGE tier — solar + wind turbines + H2 fuel cell enables summer perpetual flight. Not viable on MINI/MEDIUM. |
 
 ---
 

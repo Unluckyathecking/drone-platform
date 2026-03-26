@@ -4,9 +4,11 @@
 
 This document defines two aerial command platform variants that extend the multi-scale drone family (doc 22) into a vertically integrated, persistent operational architecture. Both variants serve as power stations, communications relays, and fleet command hubs — eliminating the range and endurance ceiling that constrains battery-powered UAVs.
 
-- **Variant 1 — Home Base Balloon**: A super-pressure balloon at 18-20 km over the permanent automated ground base. Provides laser power beaming, wideband comms relay, and data uplink for the entire drone fleet. Drones orbit beneath the balloon for in-flight recharge, landing only for physical maintenance. Cost: £100-300K.
+- **Variant 1 — Home Base Balloon**: A super-pressure balloon at 18-20 km over the permanent automated ground base. Provides limited laser power beaming (1-2 × 500W lasers max), wideband comms relay, and data uplink for the drone fleet. Drones orbit beneath the balloon for in-flight top-up, landing for primary recharge. Cost: £500K-2M.
 
-- **Variant 2 — Mobile Forward Command Airship**: A rigid or semi-rigid helium airship (50-100 m length) that self-deploys to a forward operating area carrying 10-50 drones internally. It generates 50-375 kW of solar power, launches and recovers drones from an internal hangar, and sustains autonomous operations for days to weeks. It is a flying aircraft carrier and power plant. Cost: £5-50M.
+- **Variant 2 — Mobile Forward Command Airship**: A rigid or semi-rigid helium airship (50-100 m length) that self-deploys to a forward operating area carrying 10-50 drones internally. It generates 50-375 kW of solar power, launches and recovers drones from an internal hangar, hosts the multi-kW laser array for fleet recharging, and sustains autonomous operations for days to weeks. It is a flying aircraft carrier and power plant. Cost: £50-100M for first unit.
+
+> **Note on autonomous operations:** Fully autonomous airship operation (zero human oversight) requires regulatory frameworks that do not yet exist in any jurisdiction. Initial operations will require remote pilot oversight via SATCOM link, with autonomy progressively demonstrated to regulators.
 
 Together they form a rear-area/forward-area pair: the balloon anchors the permanent base while the airship projects capability forward.
 
@@ -155,18 +157,26 @@ The balloon hovers permanently above the automated ground base (doc 26, doc 28),
   ║      laser beaming:  (during daylight hours)               ║
   ║                                                            ║
   ║  LASER POWER TRANSMITTERS                                  ║
-  ║  ├── Number:         4-8 steerable units                   ║
-  ║  ├── Per unit:       1-2 kW optical output                 ║
+  ║  ├── Number:         1-2 steerable units                   ║
+  ║  ├── Per unit:       500 W optical output                  ║
   ║  │                   (980 nm diode laser arrays)           ║
-  ║  ├── Total optical:  6-12 kW peak (all beams active)       ║
+  ║  ├── Total optical:  0.5-1 kW peak (all beams active)     ║
+  ║  │                   (multi-kW laser array moved to        ║
+  ║  │                    airship variant — see Section 2)     ║
   ║  ├── Beam steering:  2-axis gimbal per unit (±60°)         ║
   ║  ├── Tracking:       Cooperative beacon on each drone      ║
   ║  │                   + optical/IR camera tracking           ║
+  ║  │                   NOTE: Beam tracking at 15 km slant    ║
+  ║  │                   range is a major engineering challenge ║
+  ║  │                   — sub-mrad pointing accuracy required  ║
+  ║  │                   on a platform with attitude drift      ║
   ║  ├── Beam diameter:  0.5-2 m at 15-17 km slant range      ║
-  ║  ├── Atmospheric     High — beam path is mostly through    ║
-  ║  │   transmission:   stratosphere (very clear, dry)        ║
-  ║  │                   85-95% even at 15 km slant            ║
-  ║  └── Simultaneous    4-6 drones (one beam per drone)       ║
+  ║  ├── Atmospheric     60-80% (use 70% baseline)             ║
+  ║  │   transmission:   through upper atmosphere               ║
+  ║  │                   (less than ideal — scintillation       ║
+  ║  │                    and turbulence reduce effective       ║
+  ║  │                    transmission from theoretical max)    ║
+  ║  └── Simultaneous    1-2 drones                            ║
   ║      targets:                                              ║
   ║                                                            ║
   ║  COMMS PAYLOAD                                             ║
@@ -202,14 +212,15 @@ The balloon hovers permanently above the automated ground base (doc 26, doc 28),
   ║                      routinely. Target: 90-180 days        ║
   ║                                                            ║
   ║  COST ESTIMATE                                             ║
-  ║  ├── Balloon envelope:       £10,000-30,000                ║
-  ║  ├── Solar array:            £20,000-50,000                ║
-  ║  ├── Laser transmitters:     £30,000-80,000                ║
-  ║  ├── Comms payload:          £10,000-30,000                ║
-  ║  ├── Avionics + integration: £20,000-50,000                ║
-  ║  ├── Launch operations:      £5,000-15,000 per launch      ║
-  ║  ├── TOTAL (first unit):     £100,000-250,000              ║
-  ║  └── Annual operating:       £50,000-100,000               ║
+  ║  ├── Balloon envelope:       £50,000-150,000               ║
+  ║  ├── Solar array:            £50,000-150,000               ║
+  ║  ├── Laser transmitters      £80,000-200,000               ║
+  ║  │   (1-2 × 500W units):                                  ║
+  ║  ├── Comms payload:          £30,000-80,000                ║
+  ║  ├── Avionics + integration: £100,000-300,000              ║
+  ║  ├── Launch operations:      £20,000-50,000 per launch     ║
+  ║  ├── TOTAL (first unit):     £500,000-2,000,000            ║
+  ║  └── Annual operating:       £150,000-500,000              ║
   ║      (2-4 replacement balloons + maintenance)              ║
   ║                                                            ║
   ╚════════════════════════════════════════════════════════════╝
@@ -858,6 +869,34 @@ A self-deploying rigid airship that functions as a mobile aircraft carrier, powe
   the airship self-sustaining indefinitely (limited only by
   water supply — could be collected from atmospheric moisture at
   altitude, or carried as ballast).
+
+  WIND TURBINE POWER GENERATION:
+  ──────────────────────────────
+  At 3-6 km altitude, wind speeds are typically 10-30 m/s (stronger
+  and more consistent than at ground level). Frame-mounted ducted
+  wind turbines can harvest this energy:
+
+  ┌──────────────────────────────────────────────────────────────┐
+  │  AIRSHIP WIND TURBINE ARRAY                                  │
+  ├──────────────────────────────────────────────────────────────┤
+  │  Configuration: 4-8 ducted turbines on structural pylons     │
+  │  Rotor diameter: 1-2 m each                                  │
+  │  Power per turbine at 15 m/s wind: 1-3 kW                   │
+  │  Total array: 5-15 kW continuous                             │
+  │  Weight: 50-150 kg total (turbines + generators + mounting)  │
+  │  Drag penalty: equivalent to ~5-10% of airship drag          │
+  │                                                               │
+  │  KEY ADVANTAGE:                                               │
+  │  Wind turbines generate power day AND night. Combined with   │
+  │  solar (day only) and H2 fuel cell (stored energy), the      │
+  │  airship has three independent power sources:                 │
+  │  ├── Solar:        200 kW peak (day only)                    │
+  │  ├── Wind turbine: 5-15 kW continuous (day + night)          │
+  │  ├── H2 fuel cell: 15-50 kW (as needed, from stored H2)     │
+  │                                                               │
+  │  This fills the night gap alongside the H2 fuel cell and     │
+  │  reduces overnight H2 consumption by 30-50%.                  │
+  └──────────────────────────────────────────────────────────────┘
 ```
 
 ### 2.5 Drone Operations from the Airship
@@ -986,19 +1025,23 @@ A self-deploying rigid airship that functions as a mobile aircraft carrier, powe
 ### 2.6 The Structural Antenna Concept
 
 ```
-  GEODESIC FRAME AS ANTENNA ARRAY
-  ════════════════════════════════
+  GEODESIC FRAME AS ANTENNA STRUCTURE
+  ════════════════════════════════════
 
   The aluminium geodesic frame of a rigid airship forms a large
-  3D structure of conductive elements. This can be exploited:
+  3D structure of conductive elements. This can be exploited as
+  a large-aperture passive antenna or structural mount for
+  antenna elements — not a true phased array (which would require
+  precise element spacing, phase shifters, and RF feed networks
+  that are incompatible with structural member placement).
 
   CONCEPT:
   ────────
   A 75 m airship with a geodesic frame has structural members
-  forming triangulated patterns across the entire hull. If
-  segments of these members are electrically isolated and fed
-  with RF signals, the frame itself becomes a massive phased
-  array antenna.
+  forming triangulated patterns across the entire hull. The frame
+  can serve as a large-aperture antenna mount or ground plane,
+  with dedicated antenna elements mounted at calculated positions
+  on the structure.
 
   ┌──────────────────────────────────────────────────────┐
   │                                                      │
@@ -1193,9 +1236,9 @@ A self-deploying rigid airship that functions as a mobile aircraft carrier, powe
   ║                      │ (no propulsion       │ (limited by H2 fuel     ║
   ║                      │  needed)             │  and maintenance)        ║
   ╟──────────────────────┼──────────────────────┼──────────────────────────╢
-  ║ Cost (unit)          │ £100-250K            │ £5-50M                   ║
+  ║ Cost (unit)          │ £500K-2M             │ £50-100M (first unit)    ║
   ╟──────────────────────┼──────────────────────┼──────────────────────────╢
-  ║ Cost (annual ops)    │ £50-100K/yr          │ £500K-2M/yr              ║
+  ║ Cost (annual ops)    │ £150-500K/yr         │ £2-10M/yr                ║
   ╟──────────────────────┼──────────────────────┼──────────────────────────╢
   ║ Deployment           │ Needs ground base    │ Self-deploying           ║
   ║                      │ underneath           │ (IS the forward base)    ║

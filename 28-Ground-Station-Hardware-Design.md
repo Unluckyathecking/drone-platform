@@ -25,7 +25,8 @@ on top for autonomous goal-based operations.
   │ MINI tier │         │ MINI-MEDIUM   │        │ ALL tiers          │
   │ 30km range│         │ 80km range    │        │ 200+ km range      │
   │ 2hr ops   │         │ 8-12hr ops    │        │ 24/7 continuous    │
-  │ £500-800  │         │ £8,000-15,000 │        │ £150,000-500,000   │
+  │ £500-800  │         │ £8,000-15,000 │        │ £100,000-120,000   │
+  │           │         │               │        │ (+30% contingency) │
   └──────────┘         └──────────────┘        └────────────────────┘
        │                      │                         │
        └──────────────────────┴─────────────────────────┘
@@ -965,9 +966,19 @@ Reference systems studied:
   LAUNCH SYSTEM DESIGN
   ════════════════════
 
-  PRIMARY: PNEUMATIC CATAPULT (for fixed-wing MINI and MEDIUM tiers)
-  ─────────────────────────────────────────────────────────────────
+  PRIMARY FOR MINI TIER: BUNGEE LAUNCHER
+  ──────────────────────────────────────
+  The bungee launcher is the primary launch system for the MINI tier.
+  It is simple, proven, low-cost, and field-repairable. The pneumatic
+  catapult is deferred to a funded phase (Phase 4+) when budget and
+  engineering capacity allow.
 
+  Reference: Standard BMFA bungee launch practice, widely used for
+  2-4m wingspan models. Surgical tubing + launch rail.
+
+  FUTURE UPGRADE: PNEUMATIC CATAPULT (deferred to funded phase)
+  ─────────────────────────────────────────────────────────────
+  For MEDIUM tier and high-sortie-rate operations.
   Reference: Zipline P1 pneumatic catapult, Insitu ScanEagle launcher
 
   ┌────────────────────────────────────────────────────────┐
@@ -1336,8 +1347,11 @@ Reference systems studied:
   ├── Total fleet on ground at any time: 10 charging + 10 airborne
   └── Less efficient but mechanically simpler (no robotic arm)
 
-  RECOMMENDATION: Start with in-place charging (simpler).
-  Add battery swap capability when throughput demands it.
+  RECOMMENDATION: In-place charging is the PRIMARY design.
+  Battery swap is a FUTURE UPGRADE when robotic arm is proven
+  and high sortie rates demand faster turnaround. In-place
+  charging is simpler, cheaper, and eliminates the need for
+  a battery carousel and robotic arm in the initial build.
 
   THERMAL MANAGEMENT:
   ├── LiPo batteries must be charged between 10-45 degrees C
@@ -1841,6 +1855,16 @@ Reference systems studied:
   │ GRAND TOTAL (10-drone fleet)         │ £83,350 │ £129,700   │
   │ GRAND TOTAL (20-drone fleet)         │ —       │ £159,700   │
   └──────────────────────────────────────┴─────────┴────────────┘
+
+  REALISTIC BUDGET TARGET: £100,000-120,000
+  ──────────────────────────────────────────
+  The budget build (£83,350) is optimistic. Add 30% contingency for:
+  ── Unexpected site work (drainage, ground preparation)
+  ── Equipment failures and replacements during commissioning
+  ── Regulatory compliance costs (planning permission, safety assessment)
+  ── Cable runs, mounting hardware, and installation labor
+  ── Commissioning and testing time
+  Realistic budget: £100,000-120,000 with contingency.
 
   STUDENT/STARTUP COST REDUCTION OPPORTUNITIES:
   ──────────────────────────────────────────────

@@ -1105,12 +1105,18 @@ Complete software architecture for the ground control system (GCS) serving the f
   │    │      │             │                                  │           │
   │    │      │             ▼                                  │           │
   │    │      │        ┌──────────────┐                        │           │
+  │    │      │        │ CHARGE /     │                        │           │
   │    │      │        │ BATTERY SWAP │                        │           │
   │    │      │        │              │                        │           │
-  │    │      │        │ Robot removes spent battery            │           │
-  │    │      │        │ Installs charged battery from bay     │           │
-  │    │      │        │ Spent battery → charging slot         │           │
-  │    │      │        │ Verify new battery voltage + health   │           │
+  │    │      │        │ PRIMARY: In-place charging            │           │
+  │    │      │        │   Drone stays in bay, charger         │           │
+  │    │      │        │   connects automatically              │           │
+  │    │      │        │   Charge to 95%+ (30-60 min)          │           │
+  │    │      │        │ FUTURE UPGRADE: Battery swap          │           │
+  │    │      │        │   Robot removes spent battery         │           │
+  │    │      │        │   Installs charged battery from bay   │           │
+  │    │      │        │   Spent battery → charging slot       │           │
+  │    │      │        │ Verify battery voltage + health       │           │
   │    │      │        └────┬─────────┘                        │           │
   │    │      │             │                                  │           │
   │    │      │             ▼                                  │           │
@@ -1121,6 +1127,53 @@ Complete software architecture for the ground control system (GCS) serving the f
   │    │      │        │  If no mission: → IDLE                           │
   │    │      │        └──────────────┘                                    │
   │    │      │                                                            │
+  │    │      │                                                            │
+  │    │      │        ADDITIONAL STATES:                                   │
+  │    │      │                                                            │
+  │    │      │        ┌──────────────┐                                    │
+  │    │      │        │ LAUNCH_ABORT │  Launch sequence interrupted        │
+  │    │      │        │              │  (sensor fail, wind gust, obstruct.)│
+  │    │      │        │  → LOAD TO PAD (retry) or GROUNDED (if fault)    │
+  │    │      │        └──────────────┘                                    │
+  │    │      │                                                            │
+  │    │      │        ┌──────────────┐                                    │
+  │    │      │        │CONVEYOR_     │  Drone moving between zones         │
+  │    │      │        │TRANSIT       │  (recovery zone → hangar →          │
+  │    │      │        │              │   charging bay → launch pad)        │
+  │    │      │        │  Tracked by position sensors on conveyor          │
+  │    │      │        └──────────────┘                                    │
+  │    │      │                                                            │
+  │    │      │        ┌──────────────┐                                    │
+  │    │      │        │AWAITING_     │  Mission ready but weather hold     │
+  │    │      │        │WEATHER       │  (wind, rain, visibility below     │
+  │    │      │        │              │   limits). Auto-transitions to      │
+  │    │      │        │  PRE-FLIGHT when weather clears                   │
+  │    │      │        └──────────────┘                                    │
+  │    │      │                                                            │
+  │    │      │        ┌──────────────┐                                    │
+  │    │      │        │EMERGENCY_    │  Drone has declared emergency       │
+  │    │      │        │RECOVERY      │  (engine out, loss of comms,        │
+  │    │      │        │              │   structural damage in flight)      │
+  │    │      │        │  Priority recovery, clear all other pad ops       │
+  │    │      │        │  → POST-FLIGHT (damage assessment)                │
+  │    │      │        └──────────────┘                                    │
+  │    │      │                                                            │
+  │    │      │        ┌──────────────┐                                    │
+  │    │      │        │PAYLOAD_SWAP  │  Between missions, different        │
+  │    │      │        │              │  payload required. Robot removes    │
+  │    │      │        │  current payload, installs new one from magazine  │
+  │    │      │        │  CG re-verified after swap                        │
+  │    │      │        │  → PRE-FLIGHT (re-check with new payload)        │
+  │    │      │        └──────────────┘                                    │
+  │    │      │                                                            │
+  │    │      │        ┌──────────────┐                                    │
+  │    │      │        │ CHARGING     │  Drone in charging bay (primary     │
+  │    │      │        │              │  design: in-place charging on       │
+  │    │      │        │  the drone, not battery swap). Battery swap is    │
+  │    │      │        │  a future upgrade when robotics are proven.       │
+  │    │      │        │  Monitor: voltage, current, temperature, SOC     │
+  │    │      │        │  → REQUEUE when charge complete (>95%)            │
+  │    │      │        └──────────────┘                                    │
   │    │      │                                                            │
   │    │      │        FAULT STATES (any state can transition here):       │
   │    │      │        ┌──────────────┐                                    │

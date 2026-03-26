@@ -67,6 +67,8 @@ REGULATORY
   UK CAA framework fully researched
   International regulatory strategy for 14+ countries documented
   BVLOS pathway mapped (PDRA01 -> UK SORA -> full authorisation)
+  Dual UK/Canadian citizenship — strategic asset for international PoC
+    (Canada has routine BVLOS since Nov 2025, no barriers to entry)
 
 GIT REPOSITORY
   Version-controlled, commit history showing sustained development
@@ -132,12 +134,16 @@ WORKSTREAM A: SOFTWARE (ongoing, 10-15 hrs/week)
       - Multi-point surveillance route
       Deliverable: ISR planner with SITL demo
 
-  A6. Open-Source Release                           Week 6+
+  A6. Open-Source Release (credibility strategy)     Week 6+
       - Clean up README, add CONTRIBUTING.md
       - Add Apache 2.0 or MIT license
       - GitHub release v0.1.0 (Phase A)
       - Post to ArduPilot community forums
       - Post to r/ardupilot, r/drones, Hacker News (Show HN)
+      - PURPOSE: Open source is a credibility strategy, not a revenue model.
+        It builds community trust, demonstrates engineering maturity to
+        regulators and investors, and creates a hiring pipeline. Revenue
+        comes from services (DaaS), not from the software itself.
       Deliverable: Public GitHub repo with stars and forks
 
 
@@ -189,7 +195,13 @@ WORKSTREAM C: COMMUNITY + PORTFOLIO (2-3 hrs/week)
       - Quantify: "43 tests, 160+ pages of research, open-source"
       Deliverable: Personal statement draft ready for September revision
 
-  C4. YouTube / Documentation Videos                Weeks 6+
+  C4. Customer Conversations                         Weeks 1-14
+      - Have at least 3 conversations with potential customers
+        before the summer build (conservation orgs, farms, survey firms)
+      - Understand their actual needs, pricing sensitivity, existing solutions
+      - Document each conversation: who, what they need, what they'd pay
+
+  C5. YouTube / Documentation Videos                Weeks 6+
       - Screen recordings of SITL missions
       - Narrated design walkthroughs
       - Build a portfolio reel for university/grant applications
@@ -319,7 +331,17 @@ Week 8-10: PAYLOAD INTERFACE
   - Vibration test (motor full throttle, 60 sec, check tray doesn't shift)
   - Flight test with dummy payload in FBWA and AUTO
 
-Week 10-12: DOCUMENTATION + PORTFOLIO
+Week 10-11: COST-PER-MISSION ANALYSIS
+  - Create cost-per-mission spreadsheet covering:
+    - Hardware depreciation per flight hour
+    - Battery cycle cost
+    - Insurance per mission
+    - Operator time cost
+    - Travel/fuel to site
+    - Maintenance reserve per flight hour
+  - Use this to set realistic service pricing for Phase 2
+
+Week 11-12: DOCUMENTATION + PORTFOLIO
   - Compile flight logs, photos, video into portfolio
   - Write blog post: "First autonomous mission with a self-built mission engine"
   - Record demonstration video for competitions/university applications
@@ -552,6 +574,8 @@ WORKSTREAM F: UNIVERSITY APPLICATIONS
 **Duration:** 3 academic years
 **Budget:** £5,000-50,000 (grants, prizes, early revenue)
 
+> **Timeline buffer note:** All dates after Phase 2 should be read with a 2-year buffer. University timelines slip (resits, placement years, personal circumstances), grant applications take longer than expected, and hardware development rarely hits its first target date. If Phase 3 takes 4 years instead of 3, the overall plan still works — the milestones matter more than the dates.
+
 ### The Logic
 
 University provides four critical things: (1) access to workshops, labs, and equipment you cannot afford; (2) a peer talent pool to build a team; (3) credibility for grant applications; (4) three years of focused time before real-world financial pressures hit. The engineering degree itself directly advances the drone project — every module in aerodynamics, control systems, electronics, and materials science has immediate application.
@@ -634,12 +658,14 @@ TECHNICAL MILESTONES
   - UK SORA SAIL I submission for BVLOS authorisation
 
 INTERNATIONAL PROOF OF CONCEPT
-  - Research trip to India (cheapest international deployment, doc 27)
-    - Contact DGCA for experimental permission
-    - Identify local university or NGO partner
-    - Demonstrate survey/mapping capability
+  - Research trip to Canada (Mohammed has dual UK/Canadian citizenship — strategic asset)
+    - Routine BVLOS since November 2025, no SFOC needed
+    - No visa or work permit barriers
+    - Strong regulatory data transfers to UK CAA and FAA applications
+    - Identify Canadian university or industry partner
+    - Demonstrate survey/mapping capability in approved conditions
     - Build evidence base for "tested in multiple regulatory environments"
-  - Alternative: Rwanda (RCAA most permissive, doc 27) if funding permits
+  - Alternative: India (cheapest entry, startup-friendly, doc 27) if budget constrained
 
 DEFENCE ENGAGEMENT
   - Apply to DASA Open Call for Innovation (£25K-350K typically)
@@ -666,7 +692,7 @@ SWARM DEMONSTRATION
 | M3B.2 | Tileable microdrone first flight | Mar 2029 | Flight video |
 | M3B.3 | 3-unit swarm demonstration | Jun 2029 | Multi-drone video |
 | M3B.4 | UK SORA BVLOS application submitted | Mar 2029 | CAA reference number |
-| M3B.5 | International demonstration completed | Jun 2029 | Photos, partner letter |
+| M3B.5 | International demonstration completed (Canada) | Jun 2029 | Photos, partner letter |
 | M3B.6 | DASA application submitted | Dec 2028 | Submission confirmation |
 | M3B.7 | Innovate UK Smart Grant submitted | Mar 2029 | Application reference |
 | M3B.8 | Revenue exceeds £5,000 cumulative | Jun 2029 | Accounts |
@@ -701,7 +727,7 @@ BUSINESS
     - Survey: construction sites, solar farms, coastal erosion
   - Revenue target: £10,000-30,000
   - Hire first part-time employees or contractors (2-3)
-  - Apply for RAEng Enterprise Fellowship (£75K, no equity — see funding section)
+  - Apply for RAEng Enterprise Fellowship (£75K, no equity — competitive: ~20% acceptance rate, not guaranteed — see funding section)
 
 REGULATORY
   - UK SORA BVLOS authorisation obtained
@@ -762,6 +788,9 @@ OPERATIONS
 PRODUCT
   - MEDIUM tier enters service (25-50kg class)
   - Mission engine as SaaS product (monthly subscription for other operators)
+  - Drone-as-a-Service (DaaS) pricing: target 35-50% gross margins
+    (accounts for hardware depreciation, insurance, maintenance reserve,
+    operator time, and travel — use cost-per-mission spreadsheet from Phase 1)
   - Automated airbase v1 deployed at primary operating site
   - Fleet management dashboard (real-time tracking of all aircraft)
 
@@ -785,7 +814,7 @@ OPERATIONS
   - 2+ operating bases
   - Revenue target: £100-200K
   - Team: 5-10 people
-  - First international commercial operations (India, Rwanda, or Ghana)
+  - First international commercial operations (Canada, India, or Ghana)
 
 PRODUCT
   - Tethered aerostat prototype (500m-2km altitude, doc 33)
@@ -1032,7 +1061,7 @@ MATURITY (2038+)
 | Funds what | Your salary for 1 year to work full-time on the company. No equity taken. |
 | Effort | High (detailed application, interview) |
 | When to apply | Phase 3C (spring 2030), upon graduation |
-| Notes | This is the single best grant for your situation. £75K, no equity, 1-year runway. The Royal Academy of Engineering actively supports drone/autonomous systems. Apply the moment you are eligible. |
+| Notes | This is a strong grant for your situation if awarded. £75K, no equity, 1-year runway. The Royal Academy of Engineering actively supports drone/autonomous systems. However, it is competitive (~20% acceptance rate) — do not plan finances around receiving it. Apply the moment you are eligible, but have a backup funding plan. |
 
 ### 9.10 Knowledge Transfer Partnerships (KTP)
 

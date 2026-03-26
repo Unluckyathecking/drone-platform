@@ -303,8 +303,8 @@ Launched in May 2019, the CAA Innovation Sandbox is a "virtual space in which ne
 **Stage 2: PDRA01 Specific Category (Next step)**
 - What: Predefined Risk Assessment for enhanced VLOS operations
 - Cost: GBP 500/year (increased from GBP 234, effective April 2025)
-- Application time: ~15 minutes to complete; CAA aims to issue within 24 hours
-- Requirements: Remote Pilot Certificate Level 2 (RPC-L2)
+- Application time: ~15 minutes to complete; CAA processing time 4-8 weeks total
+- Requirements: Remote Pilot Certificate Level 2 (RPC-L2) — cost £800-1,500 for training + assessment
 - Capabilities: Enhanced VLOS operations beyond Open Category limits, closer to people/buildings
 - Limitations: Still VLOS -- no BVLOS
 - **Target: Within 6 months of starting real flights**
@@ -421,7 +421,7 @@ Launched in May 2019, the CAA Innovation Sandbox is a "virtual space in which ne
 
 ### 4.1 Optimal Regulatory Path
 
-The recommended strategy follows the Zipline model adapted for Mohammed's specific situation:
+The recommended strategy draws lessons from the Zipline model (as industry context, not a strategy to replicate directly — Zipline had $100M+ in funding before entering Rwanda) and adapts them for Mohammed's specific situation:
 
 **Phase 0: Build Evidence in Simulation (Now -- Summer 2026)**
 - Complete SITL development and accumulate thousands of simulated autonomous missions
@@ -432,7 +432,7 @@ The recommended strategy follows the Zipline model adapted for Mohammed's specif
 - Fly at BMFA clubs (ERFC, Caterham) under Open A3
 - Accumulate real-world autonomous VLOS flight hours
 - Build reliability data on the platform
-- Obtain PDRA01 as soon as practical (GBP 500, 24-hour turnaround)
+- Obtain PDRA01 as soon as practical (GBP 500, 4-8 weeks processing)
 
 **Phase 2: UK University + SORA Preparation (2027-2028)**
 - Enter university studying aerospace engineering, computer science, or related field
@@ -442,18 +442,17 @@ The recommended strategy follows the Zipline model adapted for Mohammed's specif
 - Target: CAA Innovation Hub submission as university-affiliated project
 
 **Phase 3: International Proof of Concept (2028-2029)**
-- **Recommended first international target: India**
-  - Lowest cost regulatory environment
-  - Explicitly designed for small operators and startups
-  - Automated Green Zone approval system
-  - Digital Sky Platform is accessible
-  - Drone promotion is national policy
-  - Real delivery infrastructure needs (rural healthcare, like Rwanda for Zipline)
+- **Recommended first international target: Canada**
+  - Mohammed holds dual UK/Canadian citizenship — no visa or work permit barriers
+  - Most accessible Western BVLOS framework (routine since November 2025, no SFOC needed)
+  - Strong regulatory data that transfers directly to UK CAA and FAA applications
+  - English-speaking, compatible legal system
+  - Well-developed aviation infrastructure
+- **Alternative: India** (lowest cost, explicitly startup-friendly, but requires more regulatory navigation)
 - **Alternative: Rwanda** (through institutional partnership -- university collaboration with Rwandan institutions)
-- **Alternative: Canada** (most accessible Western BVLOS framework, no SFOC needed since November 2025)
 
 **Phase 4: Scale and Certify (2029-2031)**
-- Apply for RAEng Enterprise Fellowship upon graduation (GBP 75K, no equity)
+- Apply for RAEng Enterprise Fellowship upon graduation (GBP 75K, no equity — competitive: ~20% acceptance rate, not guaranteed)
 - Register UK Ltd company
 - Apply for Innovate UK Smart Grants / Future Flight funding
 - Pursue UK SORA BVLOS authorization
@@ -465,8 +464,8 @@ The recommended strategy follows the Zipline model adapted for Mohammed's specif
 | Priority | Country | Rationale |
 |----------|---------|-----------|
 | 1 | **UK** | Home market, CAA regulatory path well-understood, innovation funding available, university access |
-| 2 | **India** | Cheapest entry, most startup-friendly framework, genuine need for drone delivery infrastructure |
-| 3 | **Canada** | Most accessible Western BVLOS framework (no SFOC since Nov 2025), English-speaking, good data for UK/US applications |
+| 2 | **Canada** | Mohammed has Canadian citizenship — no visa barriers. Most accessible Western BVLOS framework (routine since Nov 2025), English-speaking, strong data for UK/US applications |
+| 3 | **India** | Cheapest entry, most startup-friendly framework, genuine need for drone delivery infrastructure |
 | 4 | **Rwanda** | Proven sandbox model, but requires institutional partnership |
 | 5 | **Australia** | Excellent CASA framework with new streamlined BVLOS pathways, but geographic distance and cost |
 
@@ -523,21 +522,21 @@ The open-source approach (ArduPilot, Python, pymavlink) provides several regulat
 |--------|---------------------|----------|------|
 | **Mar-Aug 2026** | UK Flyer ID + Operator ID + BMFA | Get legal, join club, first flights | GBP ~52 |
 | **Summer 2026** | Open Category A3 operations begin | Build drone, fly at club sites, accumulate VLOS hours | GBP ~850 (hardware) |
-| **Autumn 2026** | PDRA01 application | Enhanced VLOS operations, closer to buildings/people | GBP 500 |
+| **Autumn 2026** | PDRA01 application | Enhanced VLOS operations, closer to buildings/people | GBP 500 + RPC-L2 £800-1,500 |
 | **Sep 2026-2027** | Start university | Affiliate project with university research group | -- |
 | **2027** | 100+ autonomous VLOS flights logged | Build reliability database, publish flight data | GBP 500 (PDRA01 renewal) |
 | **2027-2028** | Begin UK SORA documentation | SAIL I assessment, ConOps drafting, risk assessment | GBP 2,185 (application) |
 | **2028** | Submit to CAA Innovation Hub | University-affiliated submission | Free |
 | **2028** | Apply for Connected Places Catapult / DASA | Early-stage innovation funding | Free to apply |
-| **2028-2029** | International proof of concept (India/Canada) | First international autonomous flights with regulatory approval | GBP 2,000-5,000 |
+| **2028-2029** | International proof of concept (Canada — dual citizenship) | First international autonomous flights with regulatory approval | GBP 3,000-8,000 |
 | **2029** | UK SORA SAIL I BVLOS authorization | First legal BVLOS flights in UK | GBP 2,185 (renewal) |
 | **2029** | Graduate university, register UK Ltd | RAEng Enterprise Fellowship application | Free (fellowship provides GBP 75K) |
 | **2029-2030** | Innovate UK Smart Grant / Future Flight | Scale operations, hire team | GBP 250K-500K (grant) |
 | **2030** | UK SORA SAIL II+ for automated base operations | Expand BVLOS scope, automated launch/recovery | GBP 5,000-15,000 |
-| **2030-2031** | Second international market (Rwanda/Australia/Canada) | Use UK + India data to support applications | Variable |
+| **2030-2031** | Second international market (India/Rwanda/Australia) | Use UK + Canada data to support applications | Variable |
 | **2031** | Pathway to Certified Category / Type Certificate initiated | Commercial-scale automated airbase operations | GBP 50K+ (funded by grants/investment) |
 
-**Total estimated personal cost through university (2026-2029): GBP 6,000-10,000**
+**Total estimated personal cost through university (2026-2029): GBP 10,000-20,000**
 **Total with grant funding available (2029-2031): GBP 0 personal (grant-funded)**
 
 ---
@@ -546,7 +545,7 @@ The open-source approach (ArduPilot, Python, pymavlink) provides several regulat
 
 | Country | Authority | BVLOS Framework | Automated Ops Pathway | Timeline to Approval | Approx. Cost | Student Accessible? |
 |---------|-----------|----------------|----------------------|---------------------|--------------|-------------------|
-| **UK** | CAA | UK SORA (Apr 2025); routine BVLOS target 2027 | SORA SAIL I-VI; Innovation Sandbox; Certified Category | 2-12 months (PDRA01: 24hrs; SORA: 6-8 wks) | GBP 500-2,185+ | Yes (Open/PDRA01); Company needed for SORA |
+| **UK** | CAA | UK SORA (Apr 2025); routine BVLOS target 2027 | SORA SAIL I-VI; Innovation Sandbox; Certified Category | 2-12 months (PDRA01: 4-8 wks; SORA: 6-8 wks) | GBP 8,000-15,000 to BVLOS | Yes (Open/PDRA01); Company needed for SORA |
 | **Rwanda** | RCAA | Performance-based; nationwide for authorized operators | Fully operational (Zipline model) | Months (with govt partnership) | Negotiated | No (govt partnership required) |
 | **Ghana** | GCAA | Corridor system | Via corridors for authorized operators | Months | $4,000+ registration | No |
 | **Kenya** | KCAA | Case-by-case | Expanding (US State Dept partnership) | 6-12 months | Moderate | No |
@@ -579,7 +578,7 @@ The open-source approach (ArduPilot, Python, pymavlink) provides several regulat
 
 5. **The defence angle accelerates everything in the UK:** Windracers' dual-use model (civil + defence) attracted MOD funding and faster regulatory access. Mohammed's multi-role platform concept (ISR, cargo, comms relay) maps directly onto DASA innovation competition topics.
 
-6. **Total cost to reach BVLOS in the UK is achievable on a student budget:** GBP 52 (registration) + GBP 850 (hardware) + GBP 500 (PDRA01) + GBP 2,185 (SORA SAIL I) = approximately GBP 3,587 spread over 3 years. Grant funding can cover everything beyond that.
+6. **Total cost to reach BVLOS in the UK is achievable but significant:** GBP 52 (registration) + GBP 850 (hardware) + GBP 800-1,500 (RPC-L2 training) + GBP 500 (PDRA01) + GBP 2,185 (SORA SAIL I initial) + GBP 2,185/yr (SORA renewal) + GBP 500-2,000/yr (commercial insurance) + documentation preparation time = approximately GBP 8,000-15,000 spread over 3 years. Realistic total personal spend through university: GBP 10,000-20,000. Grant funding can cover Phase 4 onwards.
 
 ---
 

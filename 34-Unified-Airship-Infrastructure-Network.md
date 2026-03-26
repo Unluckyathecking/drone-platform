@@ -820,6 +820,10 @@ Within each tier, requests are ordered by:
 
 ## 4. ECONOMIC MODEL
 
+> **Honest assessment:** The economics of this network do not close without government infrastructure funding. The airship fleet alone costs £200-500M+ in capital, and no single commercial sector generates sufficient revenue to justify that investment. The hybrid model below depends on government willingness to fund the backbone layer as strategic infrastructure — similar to how roads, ATC, and broadband backhaul are publicly funded. Without that public investment, the commercial layer cannot justify deployment.
+>
+> **Multi-sector revenue assumption caveat:** The revenue projections below assume simultaneous multi-sector use. In practice, certain uses block others — a military mission over an area typically excludes commercial operations in that airspace for security reasons. This reduces achievable simultaneous revenue by 20-40% compared to theoretical maximums.
+
 ### 4.1 Analysis of Options
 
 **Option A: Government Infrastructure (like roads)**

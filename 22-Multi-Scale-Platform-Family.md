@@ -59,6 +59,12 @@ A family of fixed-wing UAVs sharing the same design philosophy across multiple s
   │                                         │
   │  Launch: hand-launch or bungee         │
   │  Recovery: belly landing or parachute  │
+  │                                         │
+  │  Note: MINI tier uses off-the-shelf    │
+  │  Skywalker X8 for prototyping only.    │
+  │  Production aircraft will be a custom  │
+  │  composite airframe optimised for the  │
+  │  mission profile.                      │
   └─────────────────────────────────────────┘
 ```
 
@@ -99,20 +105,26 @@ A family of fixed-wing UAVs sharing the same design philosophy across multiple s
   └─────────────────────────────────────────┘
 ```
 
-### Tier 4: LARGE (~100-200kg, 6-10m wingspan)
+### Tier 4: LARGE (~150-200kg, 10-12m wingspan)
 
 ```
   ┌─────────────────────────────────────────┐
   │  LARGE — Persistent / Strategic         │
   │                                         │
-  │  Wingspan:     6-10 m                   │
-  │  MTOW:         100-200 kg              │
+  │  Wingspan:     10-12 m                  │
+  │  MTOW:         150-200 kg              │
   │  Payload:      20-50 kg                │
   │  Endurance:    12-48 hrs               │
   │               (solar-assist / fuel)    │
   │  Cruise speed: 25-40 m/s              │
   │  Range:        500-2000 km             │
   │  Cost target:  £50,000-200,000         │
+  │                                         │
+  │  Design philosophy:                     │
+  │  Custom airframe designed for endurance │
+  │  as the primary requirement. High-AR   │
+  │  wing (AR 20-30), L/D 26-32, large    │
+  │  solar area on upper wing surface.     │
   │                                         │
   │  Roles:                                 │
   │  ├── High-altitude comms relay         │

@@ -213,7 +213,7 @@ Thrust-to-weight analysis at 200g AUW:
 | T:W ratio | 1.2:1 | **1.5:1** |
 | Hover throttle | 83% | **67%** |
 
-At 200g AUW with ducting, the T:W of 1.5:1 is adequate for controlled flight but below the 2:1 target for aggressive maneuvering. To improve:
+At 200g AUW with ducting, the T:W of 1.5:1 is adequate for controlled flight but below the 2:1 target for aggressive maneuvering. **Note:** T:W is marginal at mid-pack voltage (3.5V/cell) where thrust drops ~15-20% from full-charge values — the figures above are at full charge. Needs thrust-stand validation with actual motor/prop/duct combination across the full voltage range before committing to production. To improve:
 
 **Option 1: Reduce weight to 170g** -- T:W becomes 1.76:1 (requires smaller battery, ~350mAh)
 **Option 2: Use 1104 8000KV motors** -- adds ~4g (16g to 20g for 4 motors) but increases thrust by ~20%, yielding ~360g max thrust, T:W = 1.76:1 at 205g AUW
@@ -323,6 +323,16 @@ Hover power estimate at 67% throttle, 200g AUW, ducted:
       STM32    ◄──► ESCs (DShot600, motor control)
       STM32    ◄──► GPS (UART, 9600-115200 baud)
       STM32    ◄──► ESP32 (UART, 115200 baud, MAVLink-lite)
+
+    RF COEXISTENCE NOTE:
+      GPS (1575.42 MHz) and ESP32 (2.4 GHz WiFi) share the same
+      small PCB area (~26x26mm). At this proximity, ESP32 TX bursts
+      can desensitize the GPS front end, causing degraded fix quality
+      or total loss of lock. Mitigation: ground plane separation,
+      RF shield can over GPS module, time-division (pause ESP32 TX
+      during GPS acquisition). REQUIRES PROTOTYPE TESTING — this is
+      a known failure mode in small drones and cannot be resolved
+      by simulation alone.
 ```
 
 ### 3.3 Firmware Architecture
@@ -470,13 +480,17 @@ Drones stack face-to-face. The top surface (GPS antenna, duct inlet lips) nests 
     └──────────┴──────────┴──────────┴──────────┘   ▼
 
     Packing efficiency:
+      The key metric is VOLUMETRIC efficiency — how much of the carrier
+      payload bay is actually filled with drones:
+      3D volumetric efficiency: ~83% (see section 5.3 combined packing)
+      This is the number that matters for carrier payload capacity.
+
+      Supporting detail — 2D tiling:
       Drone area:    130 x 130 = 16,900 mm^2
       Available area: 16,900 mm^2 (square tiles perfectly)
-      Packing efficiency: ~100% (minus ~2mm gaps for tolerance)
       Actual efficiency with 1mm clearance per side:
         Effective cell: 132 x 132 mm
-        4x4 grid: 528 x 528 mm
-        Usable area ratio: (130/132)^2 = 97.0%
+        Usable area ratio: (130/132)^2 = 97.0% (2D packing)
 
     Compare with circular drones of same inscribed diameter:
       Circle area in 130mm square: pi x 65^2 = 13,273 mm^2
@@ -638,13 +652,15 @@ Three independent activation methods (redundant):
         At 0.5s: v = ~4.5 m/s (well below terminal velocity)
         Actual drop with drag: ~1.0 m
 
-      CONSERVATIVE ESTIMATE: 2.0 m altitude loss before stabilization
+      CONSERVATIVE ESTIMATE: 4-6 m altitude loss before stabilization
+      (accounts for ESC boot time, gyro settling, and mid-pack voltage
+      where thrust margins are thinner)
 
       At 0.8s (attitude stable, not yet hovering):
         d = 0.5 × 9.81 × 0.8^2 = 3.14 m (no drag)
         With drag: ~2.5 m
 
-      MINIMUM DEPLOYMENT ALTITUDE: 30 m AGL (provides 27.5m safety margin)
+      MINIMUM DEPLOYMENT ALTITUDE: 50 m AGL (provides 44-46m safety margin)
       RECOMMENDED DEPLOYMENT ALTITUDE: 100-200 m AGL
 ```
 
@@ -665,6 +681,14 @@ Three independent activation methods (redundant):
       If carrier speed = 20 m/s and deployment interval = 0.4s:
         Horizontal separation = 20 × 0.4 = 8.0 m between consecutive drones
         Vertical separation   = ~0.5 m (each successive drone has 0.4s less freefall)
+
+      ASYMMETRIC MOTOR FIRING FOR ACTIVE SEPARATION:
+        During the first 0.5s after stabilization, alternate drones fire
+        asymmetric motor pairs briefly (e.g., M1+M3 at 90%, M2+M4 at 60%)
+        to induce a lateral drift of 1-2 m/s. Odd-numbered drones drift
+        left, even-numbered drift right. This doubles the effective
+        separation between adjacent drones in the deployment string and
+        reduces collision risk during the critical stabilization phase.
 
     SPATIAL DISTRIBUTION AFTER 10s (all 10 deployed, each stabilizing):
       Drone 1:  8.0s into flight, ~50m from drop point (maneuvering)
@@ -1031,7 +1055,9 @@ Key defense applications:
 | Foam separator sheet | £0.05 | Shared across magazine |
 | Assembly labor (15 min at £12/hr) | £3.00 | Hand assembly for qty 100 |
 | | | |
-| **TOTAL PER DRONE** | **£49.50** | **Under £50 target** |
+| **TOTAL PER DRONE** | **£49.50** | At qty 1000+ with injection molds |
+
+> **Realistic cost note:** At qty 100 (MJF frames, hand assembly), actual cost is £58-68 per unit including rework, yield losses, and shipping. The £49.50 figure is achievable at qty 1000+ with injection-molded frames and batch assembly processes.
 
 ### 9.2 Minimum Viable Version (No GPS, Basic Radio) — Target <£20
 

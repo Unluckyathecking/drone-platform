@@ -31,12 +31,14 @@
 
 ### Electrical Interface
 
-**Power:** Anderson PowerPole PP45
-- Option A: 5V @ 3A (servos, small cameras)
-- Option B: 12V @ 5A (gimbals, radios)
-- Option C: VBATT raw ~22V @ 10A (payload has own regulator)
-- Selection: DIP switch on airframe, labeled per payload
-- Protection: 15A blade fuse inline
+**Power:** Anderson PowerPole PP45 (4-pole: 5V + 12V + VBATT + GND)
+- Pin 1: 5V @ 3A (servos, small cameras)
+- Pin 2: 12V @ 5A (gimbals, radios)
+- Pin 3: VBATT raw ~22V @ 10A (payload has own regulator)
+- Pin 4: GND (common return)
+- All three rails available simultaneously; payload draws only what it needs
+- Selection: DIP switch on connector plate selects which rails are active, labeled per payload
+- Protection: 15A blade fuse inline per rail
 
 **Data:** JST-GH 8-pin (1.25mm pitch)
 
@@ -50,6 +52,8 @@
 | 6 | PWM/SERVO 2 | Direct from FC |
 | 7 | GPIO / ID_0 | Payload ID bit 0 |
 | 8 | GPIO / ID_1 | Payload ID bit 1 |
+
+**Note:** ID pins (7, 8) require 10kΩ pull-up resistors to 3.3V on the airframe side. Without pull-ups, floating pin reads are unreliable and payload auto-detection will misfire.
 
 **Payload Auto-Detection (ID pins):**
 
@@ -150,7 +154,7 @@ Save as `.param` files on GCS laptop, load when swapping payloads:
 
 | Failure | Severity | Mitigation |
 |---------|----------|-----------|
-| Payload detaches in flight | CRITICAL | Safety lanyard (2mm steel cable), redundant Velcro, pre-flight pull test |
+| Payload detaches in flight | CRITICAL | Safety lanyard: M4 stainless steel through-bolt with aluminium backing plate on fuselage structure (not bare hole in PETG — PETG will creep under sustained load), 2mm steel cable to payload tray, redundant Velcro, pre-flight pull test |
 | Electrical short in payload | HIGH | Separate BEC, 15A fuse, MOSFET relay cutoff |
 | CG out of limits | CRITICAL | Mandatory balance test, arming check script, in-flight trim monitoring |
 | Connector fails mid-flight | MEDIUM | Latching connectors, strain relief, pre-flight continuity check |
@@ -165,6 +169,9 @@ Save as `.param` files on GCS laptop, load when swapping payloads:
 |------|------|
 | Dovetail rails (AL 6061-T6, 15×15mm) | £20 |
 | Spring detent pins ×2 | £12 |
+
+> **Note:** Detent pin shear load calculations needed — the pins must resist vibration-induced lateral forces without shearing under worst-case flight loads. Flag: needs verification with real hardware testing before relying on calculated margins.
+
 | Anderson PP45 connectors | £7 |
 | JST-GH 8-pin ×4 | £10 |
 | Fuse, DIP switch, wiring, hardware | £21 |
