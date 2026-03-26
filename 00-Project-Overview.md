@@ -85,6 +85,8 @@ See [22-Multi-Scale-Platform-Family](22-Multi-Scale-Platform-Family.md) for full
 | [09-UK-Regulations-and-Test-Sites](09-UK-Regulations-and-Test-Sites.md) | CAA licensing, test sites, BVLOS path |
 | [10-21] | Deep dive research documents (sensors, military, naval, pest control) |
 | [22-Multi-Scale-Platform-Family](22-Multi-Scale-Platform-Family.md) | 4-tier platform family, comms relay constellation, counter-mine concept |
+| [23-34] | Infrastructure research (mesh comms, ground stations, bases, airships, power transfer, regulatory strategy) |
+| [35-Development-and-Funding-Roadmap](35-Development-and-Funding-Roadmap.md) | **Master roadmap: full 10-year plan, funding sources, risk register, decision points** |
 
 ## Immediate Next Steps
 
