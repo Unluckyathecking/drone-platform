@@ -20,9 +20,9 @@ Each technology area was reviewed by a specialist Sonnet agent instructed to be 
   Ground Station           0      4       3     State machine incomplete, catapult unrealistic
   Regulatory Strategy      0      2       3     Real BVLOS cost £8-15K not £3.6K
   Business Model           0      3       3     No customer validation, margins overstated
-  Tube-Launch Design       —      —       —     (pending)
+  Tube-Launch Design       0      3       4     Tumble, prop start, spring reliability
   ─────────────────────────────────────────────────────────────────
-  TOTAL                    7     22      35
+  TOTAL                    7     25      39
 ```
 
 **Pattern:** Near-term engineering (built and tested) has fixable bugs. Long-term vision (theoretical) has order-of-magnitude errors in cost, mass, and performance.
@@ -139,4 +139,11 @@ The foundation is real. The bugs are fixable. The vision docs need recalibration
 
 ---
 
-*Audit conducted by 10 independent Sonnet agents, March 2026. One audit (tube-launch) pending at time of compilation.*
+### Tube-Launch Folding Wing
+- **Claim:** 99.5% wing deployment reliability, 2m freefall recovery, PERDIX-comparable
+- **Reality:** PERDIX had ~93% deployment success after years of DARPA funding. Asymmetric spring deployment causes uncontrollable tumble (430°/s roll). Pusher prop firing nose-down pushes nose further down. Over-centre wing detent may fold under 2g pull-out loads. Minimum deployment altitude should be 80-100m, not 50m.
+- **Action:** Build bare-airframe prototypes for destructive drop testing. Redesign wing lock to positive mechanical latch. Add drogue chute or weathervaning tail.
+
+---
+
+*Audit conducted by 10 independent Sonnet agents, March 2026. All 10 complete.*
