@@ -23,7 +23,7 @@
       │   ████ TRAY FLOOR (3mm) ████████   │
       │                                    │
       └──▼ dovetail lips ▼────────────────┘
-           (match rail profile + clearance)
+           (match 45° dovetail rail + 0.55mm clearance)
 """
 
 import cadquery as cq
@@ -38,6 +38,7 @@ from config import (
     RAIL_CLEARANCE, RAIL_HEIGHT,
     DETENT_HOLE_DIAMETER, DETENT_OFFSET_FROM_END,
     LANYARD_ANCHOR_DIA, LANYARD_ANCHOR_OFFSET,
+    LANYARD_BOLT_DIA, LANYARD_BACKING_PLATE_SIZE, LANYARD_BACKING_PLATE_THICKNESS,
     CONNECTOR_PLATE_WIDTH, CONNECTOR_PLATE_HEIGHT, CONNECTOR_PLATE_THICKNESS,
     ANDERSON_WIDTH, ANDERSON_HEIGHT, ANDERSON_COUNT,
     JSTGH_WIDTH, JSTGH_HEIGHT,
@@ -160,17 +161,32 @@ def make_connector_cutout(tray):
 
 
 def make_lanyard_anchors(tray):
-    """Add lanyard anchor holes for the safety cable."""
+    """Add lanyard anchor holes with backing plate recesses.
+
+    Each anchor uses an M4 stainless through-bolt with a 15mm square
+    backing plate (2mm thick stainless steel) recessed into the tray floor.
+    """
     for corner in [
         (-TRAY_WIDTH / 2 + LANYARD_ANCHOR_OFFSET, -TRAY_LENGTH / 2 + LANYARD_ANCHOR_OFFSET),
         (TRAY_WIDTH / 2 - LANYARD_ANCHOR_OFFSET, -TRAY_LENGTH / 2 + LANYARD_ANCHOR_OFFSET),
     ]:
+        # Through-bolt hole (M4)
         tray = (
             tray.faces(">Z")
             .workplane()
             .center(corner[0], corner[1])
-            .hole(LANYARD_ANCHOR_DIA, TRAY_WALL_THICKNESS + TRAY_FLOOR_THICKNESS)
+            .hole(LANYARD_BOLT_DIA, TRAY_WALL_THICKNESS + TRAY_FLOOR_THICKNESS)
         )
+
+        # Backing plate recess on the underside of the tray floor
+        recess = (
+            cq.Workplane("XY")
+            .rect(LANYARD_BACKING_PLATE_SIZE, LANYARD_BACKING_PLATE_SIZE)
+            .extrude(LANYARD_BACKING_PLATE_THICKNESS)
+            .translate((corner[0], corner[1], -LANYARD_BACKING_PLATE_THICKNESS))
+        )
+        tray = tray.cut(recess)
+
     return tray
 
 

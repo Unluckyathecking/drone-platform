@@ -7,9 +7,9 @@ Material: 6061-T6 aluminum, CNC machined or extruded.
 
       ┌──────────┐  ◄─ top_width (15mm)
       │          │
-       ╲        ╱   ◄─ 60° dovetail angle
+       ╲        ╱   ◄─ 45° dovetail angle (included)
         ╲      ╱
-         └────┘     ◄─ base_width (9mm)
+         └──┘       ◄─ base_width (≈2.6mm)
 
   With mounting holes along the base for M3 screws into fuselage floor.
 """

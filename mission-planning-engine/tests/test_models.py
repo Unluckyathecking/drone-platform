@@ -109,3 +109,31 @@ class TestBasicMission:
     def test_default_max_range(self):
         m = BasicMission(home=self._home(), waypoints=self._waypoints())
         assert m.max_range_km == 30.0
+
+    def test_altitude_exactly_at_max(self):
+        """Boundary: cruise_altitude_m == max_altitude_m should be accepted."""
+        m = BasicMission(
+            home=self._home(),
+            waypoints=self._waypoints(),
+            cruise_altitude_m=120.0,
+            max_altitude_m=120.0,
+        )
+        assert m.cruise_altitude_m == 120.0
+
+    def test_cruise_altitude_zero_rejected(self):
+        """cruise_altitude_m = 0 must fail (validator requires positive)."""
+        with pytest.raises(ValidationError, match="Cruise altitude must be positive"):
+            BasicMission(
+                home=self._home(),
+                waypoints=self._waypoints(),
+                cruise_altitude_m=0.0,
+            )
+
+    def test_single_waypoint_at_home(self):
+        """A single waypoint at the home location should be valid (zero distance)."""
+        home = self._home()
+        m = BasicMission(
+            home=home,
+            waypoints=[Coordinate(latitude=home.latitude, longitude=home.longitude)],
+        )
+        assert len(m.waypoints) == 1

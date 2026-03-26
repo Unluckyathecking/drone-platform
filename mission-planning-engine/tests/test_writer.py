@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from mpe.models import BasicMission, Coordinate
+from mpe.models import BasicMission, Coordinate, MAVCmd, MAVFrame, MissionItem
 from mpe.planner import build_mission
 from mpe.writer import format_item, to_string, write_waypoints
 
@@ -41,12 +41,89 @@ class TestFormatItem:
         parts = line.split("\t")
         assert "80.000000" in parts[10]
 
+    def test_lat_exactly_7_decimal_places(self):
+        """Verify latitude field has exactly 7 decimal digits, not more or fewer."""
+        item = MissionItem(
+            seq=0, command=MAVCmd.NAV_WAYPOINT,
+            latitude=51.1, longitude=-0.2, altitude=50.0,
+        )
+        line = format_item(item)
+        lat_field = line.split("\t")[8]
+        # Should be "51.1000000" — 7 digits after the decimal point
+        decimal_part = lat_field.split(".")[1]
+        assert len(decimal_part) == 7
+
+    def test_lon_exactly_7_decimal_places(self):
+        """Verify longitude field has exactly 7 decimal digits."""
+        item = MissionItem(
+            seq=0, command=MAVCmd.NAV_WAYPOINT,
+            latitude=51.1, longitude=-0.123456789, altitude=50.0,
+        )
+        line = format_item(item)
+        lon_field = line.split("\t")[9]
+        # Strip leading minus sign for the decimal-place check
+        decimal_part = lon_field.lstrip("-").split(".")[1]
+        assert len(decimal_part) == 7
+
+    def test_alt_exactly_6_decimal_places(self):
+        """Verify altitude field has exactly 6 decimal digits."""
+        item = MissionItem(
+            seq=0, command=MAVCmd.NAV_WAYPOINT,
+            latitude=51.1, longitude=-0.2, altitude=84.123,
+        )
+        line = format_item(item)
+        alt_field = line.split("\t")[10]
+        decimal_part = alt_field.split(".")[1]
+        assert len(decimal_part) == 6
+
+    def test_negative_longitude_preserved(self):
+        """Negative longitude should appear with a minus sign in output."""
+        item = MissionItem(
+            seq=0, command=MAVCmd.NAV_WAYPOINT,
+            latitude=51.3632, longitude=-0.2652, altitude=50.0,
+        )
+        line = format_item(item)
+        lon_field = line.split("\t")[9]
+        assert lon_field.startswith("-")
+        assert "-0.2652000" == lon_field
+
+    def test_format_item_field_order(self):
+        """Verify the 12 fields appear in the correct QGC WPL 110 order."""
+        item = MissionItem(
+            seq=5, current=True, frame=MAVFrame.GLOBAL,
+            command=MAVCmd.NAV_WAYPOINT,
+            param1=1.0, param2=2.0, param3=3.0, param4=4.0,
+            latitude=51.3632, longitude=-0.2652, altitude=84.0,
+            autocontinue=False,
+        )
+        line = format_item(item)
+        parts = line.split("\t")
+        assert parts[0] == "5"          # seq
+        assert parts[1] == "1"          # current
+        assert parts[2] == "0"          # frame (GLOBAL=0)
+        assert parts[3] == "16"         # command (NAV_WAYPOINT=16)
+        assert parts[4] == "1.000000"   # param1
+        assert parts[5] == "2.000000"   # param2
+        assert parts[6] == "3.000000"   # param3
+        assert parts[7] == "4.000000"   # param4
+        assert parts[8] == "51.3632000" # latitude
+        assert parts[9] == "-0.2652000" # longitude
+        assert parts[10] == "84.000000" # altitude
+        assert parts[11] == "0"         # autocontinue
+
 
 class TestToString:
     def test_starts_with_header(self):
         items = _build([Coordinate(latitude=51.3680, longitude=-0.2600)])
         output = to_string(items)
         assert output.startswith("QGC WPL 110\n")
+
+    def test_header_is_exactly_qgc_wpl_110(self):
+        """Header line must be exactly 'QGC WPL 110' with no trailing whitespace."""
+        items = _build([Coordinate(latitude=51.3680, longitude=-0.2600)])
+        output = to_string(items)
+        header_line = output.split("\n")[0]
+        assert header_line == "QGC WPL 110"
 
     def test_correct_line_count(self):
         wps = [
@@ -64,6 +141,13 @@ class TestToString:
         output = to_string(items)
         assert output.endswith("\n")
 
+    def test_file_ends_with_exactly_one_newline(self):
+        """Output should end with exactly one newline, not two."""
+        items = _build([Coordinate(latitude=51.3680, longitude=-0.2600)])
+        output = to_string(items)
+        assert output.endswith("\n")
+        assert not output.endswith("\n\n")
+
 
 class TestWriteWaypoints:
     def test_writes_file(self, tmp_path):
@@ -79,6 +163,14 @@ class TestWriteWaypoints:
         from_file = path.read_text()
         from_string = to_string(items)
         assert from_file == from_string
+
+    def test_file_written_as_utf8(self, tmp_path):
+        """Verify the waypoint file is written with UTF-8 encoding."""
+        items = _build([Coordinate(latitude=51.3680, longitude=-0.2600)])
+        path = write_waypoints(items, tmp_path / "test.waypoints")
+        # Read back with explicit UTF-8 — should not raise
+        content = path.read_text(encoding="utf-8")
+        assert content.startswith("QGC WPL 110")
 
 
 class TestGoldenFiles:

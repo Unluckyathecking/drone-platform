@@ -112,3 +112,47 @@ class TestBuildMission:
         wps = [Coordinate(latitude=51.3680, longitude=-0.2600, altitude=60.0)]
         items = build_mission(_mission(waypoints=wps))
         assert items[2].altitude == 60.0
+
+    def test_altitude_zero_waypoint_uses_cruise_alt(self):
+        """Silent logic hole: when coord.altitude == 0, the planner substitutes
+        cruise_altitude_m because the condition is `if coord.altitude > 0`.
+
+        This means a genuine sea-level waypoint (altitude=0) can never be
+        expressed — it will silently become cruise altitude. This test documents
+        the current behaviour so any future fix is intentional.
+        """
+        sea_level_wp = Coordinate(latitude=51.3680, longitude=-0.2600, altitude=0.0)
+        items = build_mission(_mission(waypoints=[sea_level_wp]))
+        # Current behaviour: altitude 0 is treated as "unset" and replaced
+        assert items[2].altitude == 80.0  # cruise_altitude_m from _mission()
+
+
+class TestWarningThreshold:
+    """Tests for the 40% headwind-warning threshold.
+
+    The 40% figure (rather than 50%) is a conservative safety margin.
+    Rationale: headwinds on return can effectively halve range, so warning
+    at 40% of max_range leaves a buffer. This is an engineering judgement
+    call, not a physics-derived constant — document it here so future
+    reviewers understand it is intentionally conservative, not arbitrary.
+    """
+
+    def test_waypoint_below_threshold_no_warning(self):
+        """Waypoint at 39% of max_range should produce no warning."""
+        # max_range=10 → threshold=4km. Need wp ~3.5km away.
+        close_wp = Coordinate(latitude=51.3947, longitude=-0.2652)  # ~3.5km north
+        warnings = validate(_mission(
+            waypoints=[close_wp],
+            max_range_km=10.0,
+        ))
+        assert len(warnings) == 0
+
+    def test_waypoint_above_threshold_triggers_warning(self):
+        """Waypoint beyond 40% of max_range triggers headwind warning."""
+        # max_range=10 → threshold=4km. Need wp ~5km away but total < 10km.
+        far_wp = Coordinate(latitude=51.4082, longitude=-0.2652)  # ~5km north
+        warnings = validate(_mission(
+            waypoints=[far_wp],
+            max_range_km=11.0,
+        ))
+        assert any("beyond safe threshold" in w for w in warnings)
