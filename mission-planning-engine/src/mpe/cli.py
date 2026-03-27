@@ -18,7 +18,7 @@ import sys
 
 from .models import BasicMission, Coordinate
 from .planner import ValidationError, build_mission
-from .writer import write_waypoints, to_string
+from .writers import QGCWPLWriter, CoTWriter
 from .upload import upload_mission, UploadError
 
 
@@ -76,6 +76,12 @@ def main(argv: list[str] | None = None) -> int:
         help="Output file path (default: mission.waypoints)",
     )
     parser.add_argument(
+        "--format",
+        choices=["qgc-wpl", "cot"],
+        default="qgc-wpl",
+        help="Output format (default: qgc-wpl)",
+    )
+    parser.add_argument(
         "--upload",
         action="store_true",
         help="Upload mission to ArduPilot (SITL or vehicle) after generating",
@@ -84,6 +90,21 @@ def main(argv: list[str] | None = None) -> int:
         "--connection",
         default="tcp:127.0.0.1:5760",
         help="MAVLink connection string (default: tcp:127.0.0.1:5760 for SITL)",
+    )
+    parser.add_argument(
+        "--stream",
+        action="store_true",
+        help="Stream CoT events live to a TAK network (requires --format cot)",
+    )
+    parser.add_argument(
+        "--cot-url",
+        default="udp+wo://239.2.3.1:6969",
+        help="TAK endpoint URL (default: udp+wo://239.2.3.1:6969)",
+    )
+    parser.add_argument(
+        "--callsign",
+        default="MPE-DRONE",
+        help="Drone callsign for CoT events (default: MPE-DRONE)",
     )
 
     args = parser.parse_args(argv)
@@ -103,8 +124,17 @@ def main(argv: list[str] | None = None) -> int:
         print(f"MISSION REJECTED: {e}", file=sys.stderr)
         return 1
 
+    # Select writer based on format
+    if args.format == "qgc-wpl":
+        writer = QGCWPLWriter()
+    elif args.format == "cot":
+        writer = CoTWriter()
+    else:
+        print(f"Format '{args.format}' is not yet supported.", file=sys.stderr)
+        return 1
+
     # Write waypoint file
-    path = write_waypoints(items, args.output)
+    path = writer.write(items, args.output)
     print(f"Waypoint file written: {path} ({len(items)} items)")
 
     # Print mission summary
@@ -118,6 +148,50 @@ def main(argv: list[str] | None = None) -> int:
             upload_mission(items, args.connection)
         except UploadError as e:
             print(f"UPLOAD FAILED: {e}", file=sys.stderr)
+            return 1
+
+    # Optional: live CoT streaming
+    if args.stream:
+        if args.format != "cot":
+            print("--stream requires --format cot", file=sys.stderr)
+            return 1
+
+        try:
+            from .cot_sender import CoTStreamer, StreamError
+        except StreamError as e:
+            print(f"STREAM FAILED: {e}", file=sys.stderr)
+            return 1
+
+        try:
+            streamer = CoTStreamer(
+                cot_url=args.cot_url,
+                callsign=args.callsign,
+            )
+            print(f"Publishing {len(items)} waypoints to {args.cot_url}...")
+            streamer.publish_mission(items)
+
+            # Start position reporting from home position
+            home_lat = mission.home.latitude
+            home_lon = mission.home.longitude
+            home_alt = mission.cruise_altitude_m
+            print(
+                f"Starting position reporting from home "
+                f"({home_lat:.6f}, {home_lon:.6f}, {home_alt:.1f}m)"
+            )
+            print("Press Ctrl+C to stop.")
+            streamer.start_position_reporting(home_lat, home_lon, home_alt)
+
+            # Block until interrupted
+            try:
+                while True:
+                    import time
+                    time.sleep(1)
+            except KeyboardInterrupt:
+                print("\nStopping streamer...")
+                streamer.stop()
+                print("Stopped.")
+        except StreamError as e:
+            print(f"STREAM FAILED: {e}", file=sys.stderr)
             return 1
 
     return 0

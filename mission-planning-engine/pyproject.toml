@@ -13,6 +13,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+tak = ["pytak>=7.0"]
 dev = [
     "pytest>=7.0",
     "pytest-cov",
