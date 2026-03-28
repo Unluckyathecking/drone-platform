@@ -33,8 +33,10 @@ from mpe.vessel_tracker import VesselTracker
 from mpe.classifier import EntityClassifier
 from mpe.adsb_types import adsb_category_to_cot
 from mpe.ais_types import ais_type_to_cot
+from mpe.operator_api import router as operator_router
 
 app = FastAPI(title="MPE C2 Dashboard", version="0.3.0")
+app.include_router(operator_router)
 
 # CORS for local dev
 app.add_middleware(

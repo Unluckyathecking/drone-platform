@@ -7,6 +7,8 @@ Tests cover:
 - Stale track purging
 - Stats tracking
 - IngestSource protocol compliance of existing receivers
+- CoT output pipeline (send via CoTOutput)
+- Alert engine integration (pending alert CoTs)
 """
 
 from __future__ import annotations
@@ -14,6 +16,7 @@ from __future__ import annotations
 import asyncio
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -286,16 +289,34 @@ class TestClassifyAll:
 
 
 class TestOutputCoT:
-    """Test CoreEngine._output_cot with real bridges."""
+    """Test CoreEngine._output_cot with CoTOutput integration."""
 
-    def test_output_cot_counts_events(self) -> None:
+    def test_output_cot_noop_without_cot_output(self) -> None:
+        """When cot_output is None, _output_cot is a no-op."""
         engine = CoreEngine(EngineConfig(
             adsb_enabled=False,
             ais_enabled=False,
             cot_enabled=False,
         ))
 
-        # Add tracks with valid positions (not 0,0 which are skipped)
+        engine.aircraft_tracker.update(
+            icao_hex="AABBCC",
+            latitude=51.5,
+            longitude=-0.1,
+        )
+
+        # Should not raise even with tracks present
+        engine._output_cot()
+        assert int(engine.stats["cot_events_sent"]) == 0
+
+    def test_output_cot_sends_events(self) -> None:
+        """When cot_output is configured, events are sent via send_batch."""
+        engine = CoreEngine(EngineConfig(
+            adsb_enabled=False,
+            ais_enabled=False,
+            cot_enabled=False,
+        ))
+
         engine.aircraft_tracker.update(
             icao_hex="AABBCC",
             latitude=51.5,
@@ -310,11 +331,16 @@ class TestOutputCoT:
             vessel_name="TEST SHIP",
         )
 
-        # Use a dummy cot_sender (the current implementation does not
-        # actually call methods on it -- it just counts generated XML)
-        dummy_sender = SimpleNamespace()
-        engine._output_cot(dummy_sender)
+        # Wire up a mock CoTOutput
+        mock_output = MagicMock()
+        mock_output.send_batch.return_value = 2
+        engine._cot_output = mock_output
 
+        engine._output_cot()
+
+        mock_output.send_batch.assert_called_once()
+        events_arg = mock_output.send_batch.call_args[0][0]
+        assert len(events_arg) == 2  # 1 aircraft + 1 vessel
         assert int(engine.stats["cot_events_sent"]) == 2
 
     def test_output_cot_skips_zero_position(self) -> None:
@@ -327,10 +353,154 @@ class TestOutputCoT:
         # Track with no position (lat=0, lon=0) should be skipped
         engine.aircraft_tracker.update(icao_hex="DEAD01")
 
-        dummy_sender = SimpleNamespace()
-        engine._output_cot(dummy_sender)
+        mock_output = MagicMock()
+        mock_output.send_batch.return_value = 0
+        engine._cot_output = mock_output
 
+        engine._output_cot()
+
+        events_arg = mock_output.send_batch.call_args[0][0]
+        assert len(events_arg) == 0
         assert int(engine.stats["cot_events_sent"]) == 0
+
+    def test_output_cot_includes_pending_alert_cots(self) -> None:
+        """Alert CoT XML should be included in the output batch."""
+        engine = CoreEngine(EngineConfig(
+            adsb_enabled=False,
+            ais_enabled=False,
+            cot_enabled=False,
+        ))
+
+        # Simulate pending alert CoTs
+        engine._pending_alert_cots = [
+            "<event>alert1</event>",
+            "<event>alert2</event>",
+        ]
+
+        mock_output = MagicMock()
+        mock_output.send_batch.return_value = 2
+        engine._cot_output = mock_output
+
+        engine._output_cot()
+
+        events_arg = mock_output.send_batch.call_args[0][0]
+        assert len(events_arg) == 2  # Just the 2 alerts (no tracks)
+        assert "<event>alert1</event>" in events_arg
+        assert "<event>alert2</event>" in events_arg
+        # Pending list should be cleared
+        assert engine._pending_alert_cots == []
+
+    def test_output_cot_combines_tracks_and_alerts(self) -> None:
+        """Output should combine track CoT and alert CoT."""
+        engine = CoreEngine(EngineConfig(
+            adsb_enabled=False,
+            ais_enabled=False,
+            cot_enabled=False,
+        ))
+
+        engine.aircraft_tracker.update(
+            icao_hex="AABBCC",
+            latitude=51.5,
+            longitude=-0.1,
+        )
+        engine._pending_alert_cots = ["<event>alert</event>"]
+
+        mock_output = MagicMock()
+        mock_output.send_batch.return_value = 2
+        engine._cot_output = mock_output
+
+        engine._output_cot()
+
+        events_arg = mock_output.send_batch.call_args[0][0]
+        assert len(events_arg) == 2  # 1 aircraft + 1 alert
+
+
+# ---------------------------------------------------------------------------
+# Alert engine integration tests
+# ---------------------------------------------------------------------------
+
+
+class TestAlertEngineIntegration:
+    """Test that _classify_all feeds the alert engine and captures CoT."""
+
+    def test_hostile_vessel_generates_alert_cots(self) -> None:
+        config = EngineConfig(
+            adsb_enabled=False,
+            ais_enabled=False,
+            cot_enabled=False,
+            known_hostile_mmsis={999000001},
+        )
+        engine = CoreEngine(config)
+
+        engine.vessel_tracker.update(
+            mmsi=999000001,
+            latitude=25.0,
+            longitude=55.0,
+            speed_over_ground=8.0,
+        )
+
+        engine._classify_all()
+
+        # Alert engine should have generated alert CoTs
+        assert len(engine._pending_alert_cots) >= 1
+        assert int(engine.stats["alerts_generated"]) >= 1
+        # Each pending CoT should be a non-empty XML string
+        for cot in engine._pending_alert_cots:
+            assert isinstance(cot, str)
+            assert len(cot) > 0
+
+    def test_emergency_squawk_generates_alert_cots(self) -> None:
+        engine = CoreEngine(EngineConfig(
+            adsb_enabled=False,
+            ais_enabled=False,
+            cot_enabled=False,
+        ))
+
+        engine.aircraft_tracker.update(
+            icao_hex="ABCDEF",
+            latitude=51.5,
+            longitude=-0.1,
+            altitude_baro_ft=10000,
+            squawk="7700",
+            callsign="MAYDAY",
+        )
+
+        engine._classify_all()
+
+        assert len(engine._pending_alert_cots) >= 1
+        assert int(engine.stats["alerts_generated"]) >= 1
+
+    def test_neutral_track_no_alert_cots(self) -> None:
+        engine = CoreEngine(EngineConfig(
+            adsb_enabled=False,
+            ais_enabled=False,
+            cot_enabled=False,
+        ))
+
+        engine.aircraft_tracker.update(
+            icao_hex="AABBCC",
+            latitude=51.5,
+            longitude=-0.1,
+            altitude_baro_ft=35000,
+            ground_speed_kts=450,
+            callsign="BAW123",
+            squawk="1234",
+        )
+
+        engine._classify_all()
+
+        # Neutral civilian aircraft should not trigger alerts
+        assert len(engine._pending_alert_cots) == 0
+
+    def test_pending_alert_cots_starts_empty(self) -> None:
+        engine = CoreEngine()
+
+        assert engine._pending_alert_cots == []
+
+    def test_alert_engine_initialized(self) -> None:
+        engine = CoreEngine()
+
+        assert engine._alert_engine is not None
 
 
 # ---------------------------------------------------------------------------

@@ -114,6 +114,15 @@ class CoreEngine:
             stale_seconds=self._config.cot_stale_seconds,
         )
 
+        # Alert engine
+        from mpe.alerts import AlertEngine
+
+        self._alert_engine = AlertEngine()
+        self._pending_alert_cots: list[str] = []
+
+        # CoT output (plain socket sender, wired in start())
+        self._cot_output = None  # CoTOutput instance
+
         # Database (optional persistence layer)
         self._db = None  # Optional Database instance
         self._pending_db_ops: list = []  # Queue of async callables to run
@@ -226,19 +235,17 @@ class CoreEngine:
                 self._db = None
                 self._config.db_enabled = False
 
-        # Setup CoT output
-        cot_sender = None
+        # Setup CoT output (plain socket sender -- no PyTAK dependency)
         if self._config.cot_enabled:
             try:
-                from mpe.cot_sender import CoTStreamer
+                from mpe.cot_output import CoTOutput
 
-                cot_sender = CoTStreamer(
-                    cot_url=self._config.cot_url,
-                    callsign=self._config.cot_callsign,
-                )
-                logger.info("CoT output enabled: %s", self._config.cot_url)
+                self._cot_output = CoTOutput(self._config.cot_url)
+                self._cot_output.connect()
+                logger.info("CoT output: %s", self._config.cot_url)
             except Exception as exc:
                 logger.warning("CoT output disabled: %s", exc)
+                self._cot_output = None
 
         # Main loop
         logger.info("Engine running. Press Ctrl+C to stop.")
@@ -258,8 +265,7 @@ class CoreEngine:
 
                 # Output CoT
                 if now - last_output >= self._config.output_interval_s:
-                    if cot_sender is not None:
-                        self._output_cot(cot_sender)
+                    self._output_cot()
                     last_output = now
 
                 # Purge stale
@@ -290,6 +296,10 @@ class CoreEngine:
         self._running = False
         for source in self._sources:
             source.stop()
+
+        # Disconnect CoT output
+        if self._cot_output:
+            self._cot_output.disconnect()
 
         # Flush remaining DB operations and disconnect
         if self._db:
@@ -439,13 +449,31 @@ class CoreEngine:
             track._classification = cls  # noqa: SLF001
             count += 1
 
+            entity_id = f"ADSB-{track.icao_hex}"
+
             # Queue DB persistence (no-op if DB not configured)
             if self._db:
-                entity_id = f"ADSB-{track.icao_hex}"
                 self._queue_track_persist(entity_id, "air", track)
                 self._queue_classification_persist(entity_id, "air", cls)
 
-            # Check for alerts
+            # Evaluate alert rules
+            alerts = self._alert_engine.evaluate(
+                entity_id=entity_id,
+                classification=cls,
+                domain="air",
+                latitude=track.latitude,
+                longitude=track.longitude,
+                callsign=track.callsign or track.icao_hex,
+            )
+            for alert in alerts:
+                self._pending_alert_cots.append(alert.cot_xml)
+                self._stats["alerts_generated"] = (
+                    int(self._stats.get("alerts_generated", 0)) + 1
+                )
+                if self._db:
+                    self._queue_alert_persist(entity_id, cls)
+
+            # Legacy high-threat logging (kept for backwards compatibility)
             if cls.threat_level >= 7:
                 logger.warning(
                     "HIGH THREAT: %s threat=%d %s reason=%s",
@@ -454,22 +482,35 @@ class CoreEngine:
                     cls.threat_category,
                     cls.reasoning,
                 )
-                self._stats["alerts_generated"] = (
-                    int(self._stats.get("alerts_generated", 0)) + 1
-                )
-                if self._db:
-                    self._queue_alert_persist(entity_id, cls)
 
         for track in self._vessel_tracker.active_tracks:
             cls = self._classifier.classify_vessel(track)
             track._classification = cls  # noqa: SLF001
             count += 1
 
+            entity_id = f"AIS-{track.mmsi}"
+
             # Queue DB persistence (no-op if DB not configured)
             if self._db:
-                entity_id = f"AIS-{track.mmsi}"
                 self._queue_track_persist(entity_id, "sea", track)
                 self._queue_classification_persist(entity_id, "sea", cls)
+
+            # Evaluate alert rules
+            alerts = self._alert_engine.evaluate(
+                entity_id=entity_id,
+                classification=cls,
+                domain="sea",
+                latitude=track.latitude,
+                longitude=track.longitude,
+                callsign=track.vessel_name or str(track.mmsi),
+            )
+            for alert in alerts:
+                self._pending_alert_cots.append(alert.cot_xml)
+                self._stats["alerts_generated"] = (
+                    int(self._stats.get("alerts_generated", 0)) + 1
+                )
+                if self._db:
+                    self._queue_alert_persist(entity_id, cls)
 
             if cls.threat_level >= 7:
                 logger.warning(
@@ -479,45 +520,48 @@ class CoreEngine:
                     cls.threat_category,
                     cls.reasoning,
                 )
-                self._stats["alerts_generated"] = (
-                    int(self._stats.get("alerts_generated", 0)) + 1
-                )
-                if self._db:
-                    self._queue_alert_persist(entity_id, cls)
 
         self._stats["classifications_run"] = (
             int(self._stats.get("classifications_run", 0)) + count
         )
 
-    def _output_cot(self, cot_sender: object) -> None:
+    def _output_cot(self) -> None:
         """Generate and send CoT events for all active tracks."""
-        count = 0
+        if not self._cot_output:
+            return
+
+        events: list[str] = []
 
         # Aircraft -> CoT
-        for _xml in self._adsb_bridge.tracks_to_cot(
-            self._aircraft_tracker.active_tracks,
-        ):
-            try:
-                # TODO: Send through cot_sender transport when wired up
-                count += 1
-            except Exception:
-                logger.exception("Error sending aircraft CoT event")
-
-        # Vessels -> CoT
-        for _xml in self._ais_bridge.tracks_to_cot(
-            self._vessel_tracker.active_tracks,
-        ):
-            try:
-                count += 1
-            except Exception:
-                logger.exception("Error sending vessel CoT event")
-
-        self._stats["cot_events_sent"] = (
-            int(self._stats.get("cot_events_sent", 0)) + count
+        events.extend(
+            self._adsb_bridge.tracks_to_cot(
+                self._aircraft_tracker.active_tracks,
+            ),
         )
 
-        if count > 0:
-            logger.debug("Output %d CoT events", count)
+        # Vessels -> CoT
+        events.extend(
+            self._ais_bridge.tracks_to_cot(
+                self._vessel_tracker.active_tracks,
+            ),
+        )
+
+        # Pending alerts -> CoT
+        events.extend(self._pending_alert_cots)
+        self._pending_alert_cots.clear()
+
+        sent = self._cot_output.send_batch(events)
+        self._stats["cot_events_sent"] = (
+            int(self._stats.get("cot_events_sent", 0)) + sent
+        )
+
+        if sent > 0:
+            logger.debug(
+                "Sent %d/%d CoT events to %s",
+                sent,
+                len(events),
+                self._config.cot_url,
+            )
 
     def _purge_stale(self) -> None:
         """Remove stale tracks."""
