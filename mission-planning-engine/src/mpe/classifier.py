@@ -23,6 +23,7 @@ Future ML upgrade path:
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import StrEnum
@@ -190,6 +191,7 @@ class EntityClassifier:
             )
 
         # Rule 2: Ship type classification
+        # FIX #11: Don't let ship-type rules override an explicit hostile affiliation
         ship_type = getattr(track, "ship_type", 0)
         if ship_type == 35:  # Military operations
             if result.affiliation == "neutral":
@@ -199,12 +201,14 @@ class EntityClassifier:
                     "AIS ship type 35 (military operations)",
                 )
         elif ship_type == 55:  # Law enforcement
-            result.affiliation = "friendly"
-            result.threat_level = 0
+            if result.affiliation != "hostile":
+                result.affiliation = "friendly"
+                result.threat_level = 0
             result.reasoning.append("Law enforcement vessel")
         elif ship_type == 51:  # SAR
-            result.affiliation = "friendly"
-            result.threat_level = 0
+            if result.affiliation != "hostile":
+                result.affiliation = "friendly"
+                result.threat_level = 0
             result.reasoning.append("Search and rescue vessel")
 
         # Rule 3: Speed anomaly
@@ -255,8 +259,9 @@ class EntityClassifier:
                 "Missing vessel name for large vessel type",
             )
 
-        # Final: set qualitative threat category
-        result.threat_category = _threat_level_to_category(result.threat_level)
+        # FIX #12: Only set threat_category if not explicitly set by a rule above
+        if result.threat_category == "none":
+            result.threat_category = _threat_level_to_category(result.threat_level)
 
         return result
 
@@ -351,8 +356,9 @@ class EntityClassifier:
             result.threat_level = max(result.threat_level, 4)
             result.reasoning.append(f"Low altitude alert: {alt} ft")
 
-        # Final: set qualitative threat category
-        result.threat_category = _threat_level_to_category(result.threat_level)
+        # FIX #12: Only set threat_category if not explicitly set by a rule above
+        if result.threat_category == "none":
+            result.threat_category = _threat_level_to_category(result.threat_level)
 
         return result
 
@@ -374,16 +380,8 @@ class EntityClassifier:
         if not (prev_lat and prev_lon and curr_lat and curr_lon):
             return
 
-        try:
-            from mpe.planner import _haversine_km
-            from mpe.models import Coordinate
-
-            dist = _haversine_km(
-                Coordinate(latitude=prev_lat, longitude=prev_lon),
-                Coordinate(latitude=curr_lat, longitude=curr_lon),
-            )
-        except ImportError:
-            return
+        # FIX #3: Inline haversine to avoid silent ImportError failure
+        dist = _haversine_km(prev_lat, prev_lon, curr_lat, curr_lon)
 
         if dist > threshold_km:
             result.anomalies.append(Anomaly(
@@ -404,6 +402,19 @@ class EntityClassifier:
 # ---------------------------------------------------------------------------
 # Module-level helpers
 # ---------------------------------------------------------------------------
+
+
+def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Haversine distance in kilometres -- standalone, no external deps.
+
+    FIX #3: Inlined to eliminate silent ImportError in spoofing detection.
+    """
+    R = 6371.0  # Earth radius in km
+    lat1_r, lat2_r = math.radians(lat1), math.radians(lat2)
+    dlat = math.radians(lat2 - lat1)
+    dlon = math.radians(lon2 - lon1)
+    a = math.sin(dlat / 2) ** 2 + math.cos(lat1_r) * math.cos(lat2_r) * math.sin(dlon / 2) ** 2
+    return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
 
 def _threat_level_to_category(level: int) -> str:

@@ -612,25 +612,33 @@ class TestSetupSources:
     """Test CoreEngine._setup_sources builds correct source lists."""
 
     def test_adsb_only(self) -> None:
-        config = EngineConfig(adsb_enabled=True, ais_enabled=False)
+        config = EngineConfig(adsb_enabled=True, ais_enabled=False, cot_enabled=False)
         engine = CoreEngine(config)
         engine._setup_sources()
 
         assert len(engine._sources) == 1
 
     def test_both_sources(self) -> None:
-        config = EngineConfig(adsb_enabled=True, ais_enabled=True)
+        config = EngineConfig(adsb_enabled=True, ais_enabled=True, cot_enabled=False)
         engine = CoreEngine(config)
         engine._setup_sources()
 
         assert len(engine._sources) == 2
 
     def test_no_sources(self) -> None:
-        config = EngineConfig(adsb_enabled=False, ais_enabled=False)
+        config = EngineConfig(adsb_enabled=False, ais_enabled=False, cot_enabled=False)
         engine = CoreEngine(config)
         engine._setup_sources()
 
         assert len(engine._sources) == 0
+
+    def test_cot_receiver_added_when_cot_enabled(self) -> None:
+        """CotReceiver is wired as a source when cot_enabled=True."""
+        config = EngineConfig(adsb_enabled=False, ais_enabled=False, cot_enabled=True)
+        engine = CoreEngine(config)
+        engine._setup_sources()
+
+        assert len(engine._sources) == 1  # CotReceiver only
 
 
 # ---------------------------------------------------------------------------

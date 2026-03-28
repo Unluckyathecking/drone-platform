@@ -11,6 +11,7 @@ The cache is designed for the mission-planning engine to query during flight:
 
 from __future__ import annotations
 
+import threading
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Optional
@@ -62,6 +63,7 @@ class VesselTracker:
     def __init__(self, stale_timeout_s: float = 300) -> None:
         self._tracks: dict[int, VesselTrack] = {}
         self._stale_timeout = stale_timeout_s
+        self._lock = threading.Lock()  # FIX #4: Thread safety
 
     def update(self, mmsi: int, **kwargs) -> VesselTrack:
         """Update or create a vessel track.
@@ -71,16 +73,17 @@ class VesselTracker:
         *kwargs* are silently ignored so callers can pass raw decoded
         fields without filtering.
         """
-        if mmsi in self._tracks:
-            track = self._tracks[mmsi]
-            for key, value in kwargs.items():
-                if hasattr(track, key) and value is not None:
-                    setattr(track, key, value)
-            track.last_update = datetime.now(timezone.utc)
-        else:
-            filtered = {k: v for k, v in kwargs.items() if v is not None}
-            track = VesselTrack(mmsi=mmsi, **filtered)
-            self._tracks[mmsi] = track
+        with self._lock:
+            if mmsi in self._tracks:
+                track = self._tracks[mmsi]
+                for key, value in kwargs.items():
+                    if hasattr(track, key) and value is not None:
+                        setattr(track, key, value)
+                track.last_update = datetime.now(timezone.utc)
+            else:
+                filtered = {k: v for k, v in kwargs.items() if v is not None}
+                track = VesselTrack(mmsi=mmsi, **filtered)
+                self._tracks[mmsi] = track
         return track
 
     def get(self, mmsi: int) -> Optional[VesselTrack]:
@@ -90,12 +93,14 @@ class VesselTracker:
     @property
     def active_tracks(self) -> list[VesselTrack]:
         """All non-stale vessel tracks."""
-        return [t for t in self._tracks.values() if not t.is_stale]
+        with self._lock:  # FIX #4: Thread-safe snapshot
+            return [t for t in self._tracks.values() if not t.is_stale]
 
     @property
     def all_tracks(self) -> list[VesselTrack]:
         """All vessel tracks including stale."""
-        return list(self._tracks.values())
+        with self._lock:  # FIX #4: Thread-safe snapshot
+            return list(self._tracks.values())
 
     def vessels_near(self, lat: float, lon: float, radius_km: float) -> list[VesselTrack]:
         """Find active vessels within *radius_km* of a point.
@@ -120,7 +125,8 @@ class VesselTracker:
 
     def purge_stale(self) -> int:
         """Remove all stale tracks.  Returns number removed."""
-        stale_mmsis = [mmsi for mmsi, t in self._tracks.items() if t.is_stale]
-        for mmsi in stale_mmsis:
-            del self._tracks[mmsi]
+        with self._lock:  # FIX #4: Thread-safe purge
+            stale_mmsis = [mmsi for mmsi, t in self._tracks.items() if t.is_stale]
+            for mmsi in stale_mmsis:
+                del self._tracks[mmsi]
         return len(stale_mmsis)

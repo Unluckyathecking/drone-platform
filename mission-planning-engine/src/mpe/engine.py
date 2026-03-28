@@ -87,12 +87,17 @@ class CoreEngine:
         self._running = False
         self._sources: list[IngestSource] = []
 
-        # Trackers (in-memory, will add DB persistence later)
+        # Trackers (in-memory ingest caches, fed by background threads)
         from mpe.aircraft_tracker import AircraftTracker
         from mpe.vessel_tracker import VesselTracker
 
         self._aircraft_tracker = AircraftTracker()
         self._vessel_tracker = VesselTracker()
+
+        # FIX #1: TrackManager -- fused operational picture from all sources
+        from mpe.track_manager import TrackManager
+
+        self._track_manager = TrackManager()
 
         # Classifier
         from mpe.classifier import EntityClassifier
@@ -102,6 +107,11 @@ class CoreEngine:
             known_hostile_mmsis=self._config.known_hostile_mmsis,
             known_friendly_icaos=self._config.known_friendly_icaos,
         )
+
+        # FIX #1: HealthMonitor -- detects dead ingest sources
+        from mpe.health import HealthMonitor
+
+        self._health_monitor = HealthMonitor()
 
         # CoT bridges
         from mpe.adsb_cot_bridge import ADSBCoTBridge
@@ -182,6 +192,11 @@ class CoreEngine:
             )
             self._sources.append(receiver)
             logger.info("ADS-B source enabled: %s", self._config.adsb_source)
+            # FIX #1: Register ADS-B source with health monitor
+            self._health_monitor.register_source(
+                "adsb", "adsb",
+                expected_interval_s=self._config.adsb_poll_interval_s,
+            )
 
         if self._config.ais_enabled:
             from mpe.ais_receiver import AISReceiver
@@ -192,6 +207,45 @@ class CoreEngine:
             )
             self._sources.append(receiver)
             logger.info("AIS source enabled: UDP port %d", self._config.ais_udp_port)
+            # FIX #1: Register AIS source with health monitor
+            self._health_monitor.register_source(
+                "ais", "ais", expected_interval_s=30.0,
+            )
+
+        # FIX #1: Wire CotReceiver when CoT input is enabled
+        if self._config.cot_enabled:
+            try:
+                from mpe.cot_receiver import CotReceiver
+                from mpe.track_manager import Observation
+
+                def _on_cot_event(event):
+                    """Feed incoming CoT events into TrackManager."""
+                    obs = Observation(
+                        source="cot",
+                        source_id=event.uid,
+                        latitude=event.latitude,
+                        longitude=event.longitude,
+                        altitude_m=event.altitude_hae,
+                        heading=event.heading,
+                        speed_mps=event.speed_mps,
+                        callsign=event.callsign,
+                        domain=event.domain,
+                    )
+                    self._track_manager.process_observation(obs)
+                    self._health_monitor.record("cot")
+
+                self._cot_receiver = CotReceiver(
+                    on_event=_on_cot_event,
+                    url=self._config.cot_url,
+                )
+                # Don't auto-start -- it is started in the main lifecycle
+                self._sources.append(self._cot_receiver)
+                self._health_monitor.register_source(
+                    "cot", "cot", expected_interval_s=60.0,
+                )
+                logger.info("CoT receiver enabled: %s", self._config.cot_url)
+            except Exception as exc:
+                logger.debug("CoT receiver not wired: %s", exc)
 
     # -- lifecycle ----------------------------------------------------------
 
@@ -271,7 +325,16 @@ class CoreEngine:
                 # Purge stale
                 if now - last_purge >= self._config.purge_interval_s:
                     self._purge_stale()
+                    # FIX #1: Also purge stale entities from TrackManager
+                    self._track_manager.purge_stale()
                     last_purge = now
+
+                # FIX #1: Check health of ingest sources
+                health_alerts = self._health_monitor.check()
+                for ha in health_alerts:
+                    logger.warning(
+                        "Health alert: %s", ha.get("title", "unknown"),
+                    )
 
                 # Update stats
                 self._stats["aircraft_tracked"] = len(
@@ -443,7 +506,44 @@ class CoreEngine:
         """Run classifier on all active tracks."""
         count = 0
 
-        for track in self._aircraft_tracker.active_tracks:
+        # FIX #1: Feed current tracker data into TrackManager as Observations
+        from mpe.track_manager import Observation
+
+        # FIX #13: Snapshot both tracker lists at the start and reuse
+        aircraft_snapshot = self._aircraft_tracker.active_tracks
+        vessel_snapshot = self._vessel_tracker.active_tracks
+
+        for track in aircraft_snapshot:
+            obs = Observation(
+                source="adsb",
+                source_id=track.icao_hex,
+                latitude=track.latitude,
+                longitude=track.longitude,
+                altitude_m=track.altitude_m,
+                heading=track.heading,
+                speed_mps=track.speed_mps,
+                callsign=track.callsign or "",
+                domain="air",
+            )
+            self._track_manager.process_observation(obs)
+            self._health_monitor.record("adsb")
+
+        for track in vessel_snapshot:
+            obs = Observation(
+                source="ais",
+                source_id=str(track.mmsi),
+                latitude=track.latitude,
+                longitude=track.longitude,
+                heading=track.heading,
+                speed_mps=track.speed_mps,
+                callsign=track.callsign or "",
+                name=track.vessel_name or "",
+                domain="sea",
+            )
+            self._track_manager.process_observation(obs)
+            self._health_monitor.record("ais")
+
+        for track in aircraft_snapshot:
             cls = self._classifier.classify_aircraft(track)
             # Store classification result on the track object for CoT output
             track._classification = cls  # noqa: SLF001
@@ -483,7 +583,7 @@ class CoreEngine:
                     cls.reasoning,
                 )
 
-        for track in self._vessel_tracker.active_tracks:
+        for track in vessel_snapshot:
             cls = self._classifier.classify_vessel(track)
             track._classification = cls  # noqa: SLF001
             count += 1
@@ -525,6 +625,30 @@ class CoreEngine:
             int(self._stats.get("classifications_run", 0)) + count
         )
 
+    @staticmethod
+    def _override_cot_affiliation(xml_str: str, affiliation: str) -> str:
+        """FIX #10: Override the CoT type affiliation code for hostile/suspect tracks.
+
+        CoT type format: a-{affil}-{dimension}-... where affil is f/h/n/j/u.
+        """
+        import xml.etree.ElementTree as ET
+
+        affil_map = {"hostile": "h", "suspect": "j", "friendly": "f", "neutral": "n"}
+        code = affil_map.get(affiliation)
+        if not code:
+            return xml_str
+        try:
+            root = ET.fromstring(xml_str)
+            cot_type = root.get("type", "")
+            parts = cot_type.split("-")
+            if len(parts) >= 2 and parts[0] == "a":
+                parts[1] = code
+                root.set("type", "-".join(parts))
+                return ET.tostring(root, encoding="unicode", xml_declaration=False)
+        except ET.ParseError:
+            pass
+        return xml_str
+
     def _output_cot(self) -> None:
         """Generate and send CoT events for all active tracks."""
         if not self._cot_output:
@@ -532,19 +656,35 @@ class CoreEngine:
 
         events: list[str] = []
 
-        # Aircraft -> CoT
-        events.extend(
-            self._adsb_bridge.tracks_to_cot(
-                self._aircraft_tracker.active_tracks,
-            ),
-        )
+        # FIX #13: Use snapshots for CoT output too
+        aircraft_tracks = self._aircraft_tracker.active_tracks
+        vessel_tracks = self._vessel_tracker.active_tracks
 
-        # Vessels -> CoT
-        events.extend(
-            self._ais_bridge.tracks_to_cot(
-                self._vessel_tracker.active_tracks,
-            ),
-        )
+        # Aircraft -> CoT (skip zero-position tracks, matching tracks_to_cot)
+        for track in aircraft_tracks:
+            if track.latitude == 0.0 and track.longitude == 0.0:
+                continue
+            cot_xml = self._adsb_bridge.aircraft_to_cot(track)
+            if not cot_xml:
+                continue
+            # FIX #10: Override CoT type based on classification affiliation
+            cls = getattr(track, "_classification", None)
+            if cls and cls.affiliation in ("hostile", "suspect"):
+                cot_xml = self._override_cot_affiliation(cot_xml, cls.affiliation)
+            events.append(cot_xml)
+
+        # Vessels -> CoT (skip zero-position tracks, matching tracks_to_cot)
+        for track in vessel_tracks:
+            if track.latitude == 0.0 and track.longitude == 0.0:
+                continue
+            cot_xml = self._ais_bridge.vessel_to_cot(track)
+            if not cot_xml:
+                continue
+            # FIX #10: Override CoT type based on classification affiliation
+            cls = getattr(track, "_classification", None)
+            if cls and cls.affiliation in ("hostile", "suspect"):
+                cot_xml = self._override_cot_affiliation(cot_xml, cls.affiliation)
+            events.append(cot_xml)
 
         # Pending alerts -> CoT
         events.extend(self._pending_alert_cots)
@@ -579,11 +719,13 @@ async def run_engine(config: EngineConfig | None = None) -> None:
     """Entry point for running the engine."""
     engine = CoreEngine(config)
 
-    loop = asyncio.get_event_loop()
+    # FIX #5: Use get_running_loop() (modern pattern, no deprecation warning)
+    loop = asyncio.get_running_loop()
 
     def handle_signal() -> None:
         logger.info("Received shutdown signal")
-        asyncio.ensure_future(engine.stop())
+        # FIX #6: Use loop.create_task instead of asyncio.ensure_future
+        loop.create_task(engine.stop())
 
     for sig in (signal.SIGINT, signal.SIGTERM):
         loop.add_signal_handler(sig, handle_signal)

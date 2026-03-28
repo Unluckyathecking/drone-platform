@@ -176,6 +176,7 @@ class AlertEngine:
             title = self._generate_title(rule, entity_id, classification, callsign)
             description = self._generate_description(classification)
 
+            # FIX #2: Build AlertEvent once, then set cot_xml on the existing object
             alert = AlertEvent(
                 alert_id=alert_id,
                 entity_id=entity_id,
@@ -187,21 +188,7 @@ class AlertEngine:
                 longitude=longitude,
                 rule_name=rule.name,
             )
-
-            # Generate CoT alert XML
-            alert = AlertEvent(
-                alert_id=alert.alert_id,
-                entity_id=alert.entity_id,
-                alert_type=alert.alert_type,
-                severity=alert.severity,
-                title=alert.title,
-                description=alert.description,
-                latitude=alert.latitude,
-                longitude=alert.longitude,
-                timestamp=alert.timestamp,
-                rule_name=alert.rule_name,
-                cot_xml=self._generate_cot_alert(alert),
-            )
+            alert.cot_xml = self._generate_cot_alert(alert)
 
             alerts.append(alert)
             self._cooldowns[cooldown_key] = now

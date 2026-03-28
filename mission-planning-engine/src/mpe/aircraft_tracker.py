@@ -13,6 +13,7 @@ Follows the same pattern as vessel_tracker.py for consistency.
 
 from __future__ import annotations
 
+import threading
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Optional
@@ -80,6 +81,7 @@ class AircraftTracker:
     def __init__(self, stale_timeout_s: float = 60) -> None:
         self._tracks: dict[str, AircraftTrack] = {}
         self._stale_timeout = stale_timeout_s
+        self._lock = threading.Lock()  # FIX #4: Thread safety
 
     def update(self, icao_hex: str, **kwargs) -> AircraftTrack:
         """Update or create an aircraft track.
@@ -90,16 +92,17 @@ class AircraftTracker:
         filtering.
         """
         icao = icao_hex.upper()
-        if icao in self._tracks:
-            track = self._tracks[icao]
-            for key, value in kwargs.items():
-                if hasattr(track, key) and value is not None:
-                    setattr(track, key, value)
-            track.last_update = datetime.now(timezone.utc)
-        else:
-            filtered = {k: v for k, v in kwargs.items() if v is not None}
-            track = AircraftTrack(icao_hex=icao, **filtered)
-            self._tracks[icao] = track
+        with self._lock:
+            if icao in self._tracks:
+                track = self._tracks[icao]
+                for key, value in kwargs.items():
+                    if hasattr(track, key) and value is not None:
+                        setattr(track, key, value)
+                track.last_update = datetime.now(timezone.utc)
+            else:
+                filtered = {k: v for k, v in kwargs.items() if v is not None}
+                track = AircraftTrack(icao_hex=icao, **filtered)
+                self._tracks[icao] = track
         return track
 
     def get(self, icao_hex: str) -> Optional[AircraftTrack]:
@@ -109,12 +112,14 @@ class AircraftTracker:
     @property
     def active_tracks(self) -> list[AircraftTrack]:
         """All non-stale aircraft tracks."""
-        return [t for t in self._tracks.values() if not t.is_stale]
+        with self._lock:  # FIX #4: Thread-safe snapshot
+            return [t for t in self._tracks.values() if not t.is_stale]
 
     @property
     def all_tracks(self) -> list[AircraftTrack]:
         """All aircraft tracks including stale."""
-        return list(self._tracks.values())
+        with self._lock:  # FIX #4: Thread-safe snapshot
+            return list(self._tracks.values())
 
     def aircraft_near(self, lat: float, lon: float, radius_km: float) -> list[AircraftTrack]:
         """Find active aircraft within *radius_km* of a point.
@@ -143,7 +148,8 @@ class AircraftTracker:
 
     def purge_stale(self) -> int:
         """Remove all stale tracks.  Returns number removed."""
-        stale_keys = [k for k, t in self._tracks.items() if t.is_stale]
-        for k in stale_keys:
-            del self._tracks[k]
+        with self._lock:  # FIX #4: Thread-safe purge
+            stale_keys = [k for k, t in self._tracks.items() if t.is_stale]
+            for k in stale_keys:
+                del self._tracks[k]
         return len(stale_keys)

@@ -23,6 +23,9 @@ from urllib.parse import urlparse
 
 logger = logging.getLogger("mpe.cot_receiver")
 
+# FIX #9: Maximum TCP buffer size to prevent unbounded memory growth
+MAX_BUFFER_SIZE = 1_000_000  # 1 MB
+
 
 @dataclass
 class CotEvent:
@@ -181,9 +184,11 @@ class CotReceiver:
     ) -> None:
         self._on_event = on_event or (lambda e: None)
         self._url = url
-        self._scheme = "tcp" if "tcp" in url else "udp"
 
+        # FIX #14: Use urlparse for scheme detection instead of substring check
         parsed = urlparse(url)
+        self._scheme = parsed.scheme if parsed.scheme in ("tcp", "udp") else "tcp"
+
         self._host = parsed.hostname or "0.0.0.0"
         self._port = parsed.port or 8087
 
@@ -225,6 +230,7 @@ class CotReceiver:
         ``<event>...</event>`` elements as they appear.
         """
         while self._running:
+            sock = None
             try:
                 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 sock.settimeout(5.0)
@@ -242,20 +248,29 @@ class CotReceiver:
                         if not data:
                             break  # Connection closed by server
                         self._buffer += data.decode("utf-8", errors="ignore")
+                        # FIX #9: Enforce buffer size limit
+                        if len(self._buffer) > MAX_BUFFER_SIZE:
+                            logger.error(
+                                "TCP buffer exceeded %d bytes, resetting",
+                                MAX_BUFFER_SIZE,
+                            )
+                            self._buffer = ""
                         self._process_buffer()
                     except socket.timeout:
                         continue
                     except Exception as exc:
                         logger.error("TCP receive error: %s", exc)
                         break
-
-                sock.close()
             except Exception as exc:
                 logger.warning(
                     "TAK Server connection failed: %s, retrying in 5s",
                     exc,
                 )
                 time.sleep(5)
+            finally:
+                # FIX #7: Ensure TCP socket is always closed
+                if sock is not None:
+                    sock.close()
 
     def _udp_receive(self) -> None:
         """Listen for UDP CoT datagrams.
@@ -291,21 +306,22 @@ class CotReceiver:
             self._port,
         )
 
-        while self._running:
-            try:
-                data, _addr = sock.recvfrom(65535)
-                xml_str = data.decode("utf-8", errors="ignore")
-                self._events_received += 1
-                event = parse_cot_xml(xml_str)
-                if event:
-                    self._events_parsed += 1
-                    self._on_event(event)
-            except socket.timeout:
-                continue
-            except Exception as exc:
-                logger.error("UDP receive error: %s", exc)
-
-        sock.close()
+        try:  # FIX #8: Ensure UDP socket is always closed
+            while self._running:
+                try:
+                    data, _addr = sock.recvfrom(65535)
+                    xml_str = data.decode("utf-8", errors="ignore")
+                    self._events_received += 1
+                    event = parse_cot_xml(xml_str)
+                    if event:
+                        self._events_parsed += 1
+                        self._on_event(event)
+                except socket.timeout:
+                    continue
+                except Exception as exc:
+                    logger.error("UDP receive error: %s", exc)
+        finally:
+            sock.close()
 
     def _process_buffer(self) -> None:
         """Extract complete ``<event>...</event>`` elements from the TCP buffer.
