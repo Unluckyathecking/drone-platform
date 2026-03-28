@@ -16,6 +16,7 @@ dependencies = [
 tak = ["pytak>=7.0"]
 ais = ["pyais>=2.5"]
 dashboard = ["fastapi>=0.100", "uvicorn>=0.20"]
+db = ["sqlalchemy[asyncio]>=2.0", "asyncpg>=0.29", "geoalchemy2>=0.14"]
 dev = [
     "pytest>=7.0",
     "pytest-cov",
