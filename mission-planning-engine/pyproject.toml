@@ -15,6 +15,7 @@ dependencies = [
 [project.optional-dependencies]
 tak = ["pytak>=7.0"]
 ais = ["pyais>=2.5"]
+dashboard = ["fastapi>=0.100", "uvicorn>=0.20"]
 dev = [
     "pytest>=7.0",
     "pytest-cov",

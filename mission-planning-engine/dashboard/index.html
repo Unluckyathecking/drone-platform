@@ -1,0 +1,906 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MPE // COMMAND</title>
+<link href="https://unpkg.com/maplibre-gl@4.1.0/dist/maplibre-gl.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --friendly: #4FC3F7;
+  --neutral: #66BB6A;
+  --hostile: #EF5350;
+  --suspect: #FFA726;
+  --unknown: #9E9E9E;
+  --bg: #0a0e17;
+  --panel: #111827;
+  --panel-border: #1e293b;
+  --text: #e2e8f0;
+  --text-dim: #64748b;
+  --text-muted: #475569;
+  --accent: #4FC3F7;
+  --danger: #EF5350;
+  --warning: #FFA726;
+  --success: #66BB6A;
+  --glow-accent: rgba(79, 195, 247, 0.15);
+  --glow-danger: rgba(239, 83, 80, 0.25);
+}
+
+html, body {
+  height: 100%; overflow: hidden; background: var(--bg); color: var(--text);
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ═══════════════ TOP BAR ═══════════════ */
+#topbar {
+  position: fixed; top: 0; left: 0; right: 0; height: 44px; z-index: 1000;
+  background: var(--panel); border-bottom: 1px solid var(--panel-border);
+  display: flex; align-items: center; justify-content: space-between; padding: 0 16px;
+}
+#topbar::after {
+  content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent); opacity: 0.4;
+}
+.topbar-left { display: flex; align-items: center; gap: 12px; }
+.topbar-brand { font-size: 13px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; white-space: nowrap; }
+.topbar-brand span { color: var(--accent); }
+.topbar-context { font-size: 10px; color: var(--text-dim); letter-spacing: 1.5px; text-transform: uppercase; }
+
+.topbar-center { display: flex; align-items: center; gap: 0; }
+.topbar-sep { width: 1px; height: 24px; background: var(--panel-border); margin: 0 12px; }
+
+.stat-badge {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 10px; border: 1px solid var(--panel-border); background: rgba(17,24,39,0.8);
+  cursor: default; transition: all 0.15s;
+}
+.stat-badge .stat-icon { font-size: 14px; }
+.stat-badge .stat-val { font-size: 16px; font-weight: 700; line-height: 1; }
+.stat-badge.air .stat-val { color: var(--accent); }
+.stat-badge.sea .stat-val { color: var(--neutral); }
+.stat-badge.drone .stat-val { color: #7c4dff; }
+.stat-badge.threat .stat-val { color: var(--danger); }
+
+.layer-toggles { display: flex; align-items: center; gap: 4px; }
+.layer-btn {
+  padding: 4px 10px; border: 1px solid var(--panel-border); background: transparent;
+  color: var(--text-muted); font-family: inherit; font-size: 10px; font-weight: 600;
+  letter-spacing: 1px; text-transform: uppercase; cursor: pointer; transition: all 0.15s;
+  user-select: none;
+}
+.layer-btn:hover { border-color: var(--text-dim); color: var(--text-dim); }
+.layer-btn.on { background: rgba(79,195,247,0.12); border-color: var(--accent); color: var(--accent); }
+
+.topbar-right { display: flex; align-items: center; gap: 12px; }
+.utc-clock { font-size: 13px; font-weight: 600; letter-spacing: 2px; }
+.live-dot {
+  width: 8px; height: 8px; border-radius: 50%; background: var(--success);
+  animation: pulse-live 2s ease-in-out infinite;
+}
+.live-label { font-size: 10px; font-weight: 700; letter-spacing: 2px; color: var(--success); }
+@keyframes pulse-live { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+/* ═══════════════ LAYOUT GRID ═══════════════ */
+#app {
+  position: fixed; top: 44px; left: 0; right: 0; bottom: 0;
+  display: grid;
+  grid-template-columns: 220px 1fr 0px;
+  grid-template-rows: 1fr auto;
+}
+#app.detail-open { grid-template-columns: 220px 1fr 300px; }
+
+/* ═══════════════ LEFT SIDEBAR ═══════════════ */
+#sidebar-left {
+  grid-row: 1; grid-column: 1;
+  background: var(--panel); border-right: 1px solid var(--panel-border);
+  display: flex; flex-direction: column; overflow: hidden; z-index: 10;
+}
+.sidebar-header {
+  padding: 10px 14px; border-bottom: 1px solid var(--panel-border);
+  font-size: 10px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;
+  color: var(--text-dim);
+}
+.focus-list {
+  flex: 1; overflow-y: auto; padding: 4px 0;
+}
+.focus-list::-webkit-scrollbar { width: 4px; }
+.focus-list::-webkit-scrollbar-thumb { background: var(--panel-border); }
+
+.focus-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 14px; cursor: pointer; transition: background 0.1s;
+  border-left: 2px solid transparent;
+}
+.focus-item:hover { background: rgba(79,195,247,0.06); }
+.focus-item.active { background: rgba(79,195,247,0.1); border-left-color: var(--accent); }
+.focus-item .fi-flag { font-size: 16px; }
+.focus-item .fi-label { font-size: 11px; font-weight: 500; }
+.focus-item .fi-count { margin-left: auto; font-size: 10px; color: var(--text-dim); font-weight: 600; }
+
+.sidebar-divider { height: 1px; background: var(--panel-border); margin: 6px 14px; }
+
+.filter-section { padding: 8px 14px; }
+.filter-section label { font-size: 10px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; color: var(--text-dim); margin-bottom: 6px; display: block; }
+.filter-input {
+  width: 100%; padding: 6px 10px; background: var(--bg); border: 1px solid var(--panel-border);
+  color: var(--text); font-family: inherit; font-size: 11px; outline: none;
+  border-radius: 2px; transition: border-color 0.15s;
+}
+.filter-input:focus { border-color: var(--accent); box-shadow: 0 0 0 1px var(--glow-accent); }
+.filter-input::placeholder { color: var(--text-muted); }
+
+.country-list { flex: 1; overflow-y: auto; padding: 0; }
+.country-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 14px; cursor: pointer; font-size: 11px; color: var(--text-dim);
+  transition: all 0.1s;
+}
+.country-item:hover { color: var(--text); background: rgba(255,255,255,0.03); }
+
+/* ═══════════════ MAP CONTAINER ═══════════════ */
+#map-container {
+  grid-row: 1; grid-column: 2; position: relative;
+}
+#map { width: 100%; height: 100%; }
+.maplibregl-ctrl-attrib { display: none !important; }
+
+/* map overlays */
+#map-stats {
+  position: absolute; top: 10px; left: 10px; z-index: 5;
+  display: flex; gap: 6px;
+}
+.map-chip {
+  padding: 3px 8px; background: rgba(17,24,39,0.85); border: 1px solid var(--panel-border);
+  font-size: 10px; color: var(--text-dim); backdrop-filter: blur(4px);
+}
+.map-chip b { color: var(--text); font-weight: 600; }
+
+/* ═══════════════ RIGHT SIDEBAR (detail panel) ═══════════════ */
+#sidebar-right {
+  grid-row: 1; grid-column: 3;
+  background: var(--panel); border-left: 1px solid var(--panel-border);
+  overflow-y: auto; overflow-x: hidden; display: none;
+}
+#app.detail-open #sidebar-right { display: block; }
+
+.detail-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px; border-bottom: 1px solid var(--panel-border);
+}
+.detail-header h3 { font-size: 12px; font-weight: 700; letter-spacing: 1px; }
+.detail-close {
+  background: none; border: none; color: var(--text-dim); font-size: 16px;
+  cursor: pointer; font-family: inherit; line-height: 1;
+}
+.detail-close:hover { color: var(--text); }
+
+.detail-body { padding: 12px 14px; }
+.detail-row {
+  display: flex; justify-content: space-between; padding: 5px 0;
+  border-bottom: 1px solid rgba(30,41,59,0.5);
+}
+.detail-key { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); }
+.detail-val { font-size: 11px; font-weight: 600; text-align: right; }
+
+.detail-section-title {
+  font-size: 10px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;
+  color: var(--text-dim); margin: 14px 0 6px; padding-top: 8px;
+  border-top: 1px solid var(--panel-border);
+}
+
+/* affiliation colors in detail */
+.aff-friendly { color: var(--friendly); }
+.aff-neutral { color: var(--neutral); }
+.aff-hostile { color: var(--hostile); }
+.aff-suspect { color: var(--suspect); }
+.aff-unknown { color: var(--unknown); }
+
+/* ═══════════════ THREAT BOARD ═══════════════ */
+#threat-board {
+  grid-column: 1 / -1; grid-row: 2;
+  background: var(--panel); border-top: 1px solid var(--panel-border);
+  overflow: hidden; transition: height 0.2s ease;
+  height: 36px;
+}
+#threat-board.expanded { height: 160px; }
+
+.threat-header {
+  display: flex; align-items: center; gap: 12px;
+  padding: 8px 16px; cursor: pointer; user-select: none;
+  height: 36px;
+}
+.threat-header:hover { background: rgba(239,83,80,0.04); }
+.threat-icon { color: var(--danger); font-size: 13px; }
+.threat-title { font-size: 10px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--danger); }
+.threat-count {
+  font-size: 11px; font-weight: 700; color: var(--text);
+  padding: 1px 8px; background: rgba(239,83,80,0.15); border: 1px solid rgba(239,83,80,0.3);
+}
+.threat-expand { margin-left: auto; font-size: 10px; color: var(--text-dim); letter-spacing: 1px; text-transform: uppercase; }
+
+.threat-table {
+  width: 100%; overflow-x: auto; overflow-y: auto;
+  max-height: 124px; padding: 0 16px 8px;
+}
+.threat-table table { width: 100%; border-collapse: collapse; font-size: 11px; }
+.threat-table th {
+  text-align: left; padding: 4px 10px; font-size: 9px; font-weight: 700;
+  letter-spacing: 1.5px; text-transform: uppercase; color: var(--text-muted);
+  border-bottom: 1px solid var(--panel-border); position: sticky; top: 0;
+  background: var(--panel);
+}
+.threat-table td { padding: 4px 10px; border-bottom: 1px solid rgba(30,41,59,0.3); white-space: nowrap; }
+.threat-table tr:hover td { background: rgba(239,83,80,0.04); }
+.threat-table tr { cursor: pointer; }
+
+.sev-critical { color: var(--danger); font-weight: 700; }
+.sev-high { color: var(--warning); font-weight: 700; }
+.sev-medium { color: #fdd835; font-weight: 600; }
+.sev-low { color: var(--text-dim); }
+
+/* ═══════════════ RESPONSIVE ═══════════════ */
+@media (max-width: 1200px) {
+  #sidebar-left { width: 56px; min-width: 56px; }
+  #app { grid-template-columns: 56px 1fr 0px; }
+  #app.detail-open { grid-template-columns: 56px 1fr 300px; }
+  .sidebar-header, .filter-section, .country-list, .sidebar-divider { display: none; }
+  .focus-item .fi-label, .focus-item .fi-count { display: none; }
+  .focus-item { justify-content: center; padding: 10px 0; }
+}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════ TOP BAR ═══════════════ -->
+<div id="topbar">
+  <div class="topbar-left">
+    <div class="topbar-brand"><span>MPE</span> // COMMAND</div>
+    <div class="topbar-context" id="ctx-label"></div>
+  </div>
+  <div class="topbar-center">
+    <div class="stat-badge air">
+      <span class="stat-icon">&#9992;</span>
+      <span class="stat-val" id="count-air">0</span>
+    </div>
+    <div class="stat-badge sea">
+      <span class="stat-icon">&#9875;</span>
+      <span class="stat-val" id="count-sea">0</span>
+    </div>
+    <div class="stat-badge drone">
+      <span class="stat-icon">&#9670;</span>
+      <span class="stat-val" id="count-drone">0</span>
+    </div>
+    <div class="stat-badge threat">
+      <span class="stat-icon">&#9888;</span>
+      <span class="stat-val" id="count-threat">0</span>
+    </div>
+    <div class="topbar-sep"></div>
+    <div class="layer-toggles">
+      <button class="layer-btn on" data-layer="air" onclick="toggleLayer(this)">AIR</button>
+      <button class="layer-btn on" data-layer="sea" onclick="toggleLayer(this)">SEA</button>
+      <button class="layer-btn on" data-layer="thr" onclick="toggleLayer(this)">THR</button>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <div class="utc-clock" id="utc-clock">00:00:00Z</div>
+    <div style="display:flex;align-items:center;gap:6px;">
+      <div class="live-dot" id="live-dot"></div>
+      <div class="live-label" id="live-label">LIVE</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ APP GRID ═══════════════ -->
+<div id="app">
+  <!-- LEFT SIDEBAR -->
+  <div id="sidebar-left">
+    <div class="sidebar-header">FOCUS</div>
+    <div class="focus-list" id="focus-list">
+      <div class="focus-item active" data-code="GLOBAL" onclick="focusRegion(this)">
+        <span class="fi-flag">&#127760;</span>
+        <span class="fi-label">GLOBAL</span>
+      </div>
+    </div>
+    <div class="sidebar-divider"></div>
+    <div class="filter-section">
+      <label>FILTER</label>
+      <input class="filter-input" id="country-filter" type="text" placeholder="Search..." oninput="filterCountries(this.value)">
+    </div>
+    <div class="country-list" id="country-list"></div>
+  </div>
+
+  <!-- MAP -->
+  <div id="map-container">
+    <div id="map"></div>
+    <div id="map-stats">
+      <div class="map-chip">TRACKS: <b id="chip-tracks">0</b></div>
+      <div class="map-chip">RADIUS: <b id="chip-radius">250nm</b></div>
+      <div class="map-chip">REFRESH: <b>5s</b></div>
+    </div>
+  </div>
+
+  <!-- RIGHT SIDEBAR (entity detail) -->
+  <div id="sidebar-right">
+    <div class="detail-header">
+      <h3 id="detail-title">ENTITY DETAIL</h3>
+      <button class="detail-close" onclick="closeDetail()">&times;</button>
+    </div>
+    <div class="detail-body" id="detail-body"></div>
+  </div>
+
+  <!-- THREAT BOARD -->
+  <div id="threat-board">
+    <div class="threat-header" onclick="toggleThreats()">
+      <span class="threat-icon">&#9888;</span>
+      <span class="threat-title">THREAT BOARD</span>
+      <span class="threat-count" id="threat-board-count">0 ACTIVE</span>
+      <span class="threat-expand" id="threat-expand-label">&#9660; EXPAND</span>
+    </div>
+    <div class="threat-table">
+      <table>
+        <thead>
+          <tr>
+            <th>LVL</th><th>ID</th><th>DOM</th><th>AFF</th><th>SPD</th><th>SEV</th><th>REASON</th><th>POS</th>
+          </tr>
+        </thead>
+        <tbody id="threat-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/maplibre-gl@4.1.0/dist/maplibre-gl.js"></script>
+<script>
+'use strict';
+
+// ═══════════════ STATE ═══════════════
+const state = {
+  activeCountry: null,
+  layerToggles: { air: true, sea: true, thr: true },
+  selectedEntity: null,
+  threatExpanded: false,
+  lastData: null,
+  countries: [],
+  countryBounds: {}
+};
+
+const emptyGeoJSON = { type: 'FeatureCollection', features: [] };
+
+// ═══════════════ MAP INIT ═══════════════
+const map = new maplibregl.Map({
+  container: 'map',
+  style: {
+    version: 8,
+    name: 'MPE Dark',
+    sources: {
+      'osm-raster': {
+        type: 'raster',
+        tiles: ['https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png'],
+        tileSize: 256,
+        attribution: ''
+      }
+    },
+    layers: [{
+      id: 'background', type: 'background',
+      paint: { 'background-color': '#0a0e17' }
+    }, {
+      id: 'osm-raster', type: 'raster', source: 'osm-raster',
+      paint: { 'raster-opacity': 1.0, 'raster-saturation': -0.3, 'raster-brightness-max': 1.0 }
+    }],
+    glyphs: 'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf'
+  },
+  center: [0, 20],
+  zoom: 2,
+  maxZoom: 18,
+  attributionControl: false
+});
+
+map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-right');
+
+map.on('load', function () {
+  // ── GeoJSON source with clustering ──
+  map.addSource('tracks', {
+    type: 'geojson',
+    data: emptyGeoJSON,
+    cluster: true,
+    clusterMaxZoom: 8,
+    clusterRadius: 50,
+    clusterProperties: {
+      sum_air: ['+', ['case', ['==', ['get', 'domain'], 'air'], 1, 0]],
+      sum_sea: ['+', ['case', ['==', ['get', 'domain'], 'sea'], 1, 0]],
+      sum_threat: ['+', ['case', ['>=', ['get', 'threat_level'], 4], 1, 0]]
+    }
+  });
+
+  // ── Cluster circles ──
+  map.addLayer({
+    id: 'clusters', type: 'circle', source: 'tracks',
+    filter: ['has', 'point_count'],
+    paint: {
+      'circle-color': [
+        'case',
+        ['>', ['get', 'sum_threat'], 0], 'rgba(239,83,80,0.5)',
+        '#263248'
+      ],
+      'circle-radius': ['step', ['get', 'point_count'], 14, 50, 20, 200, 28, 1000, 36],
+      'circle-stroke-width': 1.5,
+      'circle-stroke-color': 'rgba(79,195,247,0.4)',
+      'circle-opacity': 0.8
+    }
+  });
+
+  // ── Cluster count ──
+  map.addLayer({
+    id: 'cluster-count', type: 'symbol', source: 'tracks',
+    filter: ['has', 'point_count'],
+    layout: {
+      'text-field': '{point_count_abbreviated}',
+      'text-font': ['Open Sans Semibold'],
+      'text-size': 11
+    },
+    paint: {
+      'text-color': '#e2e8f0'
+    }
+  });
+
+  // ── Individual entities (unclustered) ──
+  map.addLayer({
+    id: 'entities', type: 'circle', source: 'tracks',
+    filter: ['!', ['has', 'point_count']],
+    paint: {
+      'circle-color': [
+        'match', ['get', 'affiliation'],
+        'friendly', '#4FC3F7',
+        'neutral', '#66BB6A',
+        'hostile', '#EF5350',
+        'suspect', '#FFA726',
+        '#9E9E9E'
+      ],
+      'circle-radius': [
+        'interpolate', ['linear'], ['zoom'],
+        2, ['match', ['get', 'domain'], 'air', 2.5, 'sea', 3, 'drone', 3.5, 2.5],
+        6, ['match', ['get', 'domain'], 'air', 4, 'sea', 5, 'drone', 6, 4],
+        12, ['match', ['get', 'domain'], 'air', 6, 'sea', 7, 'drone', 8, 6]
+      ],
+      'circle-stroke-width': [
+        'case',
+        ['==', ['get', 'domain'], 'drone'], 1.5,
+        0.8
+      ],
+      'circle-stroke-color': [
+        'case',
+        ['==', ['get', 'domain'], 'drone'], '#7c4dff',
+        'rgba(0,0,0,0.6)'
+      ],
+      'circle-opacity': 0.85
+    }
+  });
+
+  // ── Threat highlight rings ──
+  map.addLayer({
+    id: 'threat-rings', type: 'circle', source: 'tracks',
+    filter: ['all',
+      ['!', ['has', 'point_count']],
+      ['>=', ['get', 'threat_level'], 4]
+    ],
+    paint: {
+      'circle-color': 'transparent',
+      'circle-stroke-color': [
+        'interpolate', ['linear'], ['get', 'threat_level'],
+        4, 'rgba(255,167,38,0.6)',
+        7, 'rgba(239,83,80,0.8)',
+        10, '#EF5350'
+      ],
+      'circle-stroke-width': [
+        'interpolate', ['linear'], ['get', 'threat_level'],
+        4, 1.5, 10, 3
+      ],
+      'circle-radius': [
+        'interpolate', ['linear'], ['zoom'],
+        2, 8, 8, 14, 14, 20
+      ]
+    }
+  });
+
+  // ── Callsign labels (zoom >= 6) ──
+  map.addLayer({
+    id: 'labels-callsign', type: 'symbol', source: 'tracks',
+    filter: ['!', ['has', 'point_count']],
+    minzoom: 6,
+    layout: {
+      'text-field': ['get', 'callsign'],
+      'text-font': ['Open Sans Semibold'],
+      'text-size': 10,
+      'text-offset': [0, 1.4],
+      'text-anchor': 'top',
+      'text-allow-overlap': false,
+      'text-optional': true
+    },
+    paint: {
+      'text-color': '#e2e8f0',
+      'text-halo-color': 'rgba(10,14,23,0.9)',
+      'text-halo-width': 1.5
+    }
+  });
+
+  // ── Altitude/speed labels (zoom >= 8) ──
+  map.addLayer({
+    id: 'labels-detail', type: 'symbol', source: 'tracks',
+    filter: ['!', ['has', 'point_count']],
+    minzoom: 8,
+    layout: {
+      'text-field': [
+        'concat',
+        ['case', ['has', 'altitude'], ['concat', ['to-string', ['get', 'altitude']], 'ft'], ''],
+        ' ',
+        ['case', ['has', 'speed'], ['concat', ['to-string', ['get', 'speed']], 'kt'], '']
+      ],
+      'text-font': ['Open Sans Semibold'],
+      'text-size': 9,
+      'text-offset': [0, 2.6],
+      'text-anchor': 'top',
+      'text-allow-overlap': false,
+      'text-optional': true
+    },
+    paint: {
+      'text-color': '#64748b',
+      'text-halo-color': 'rgba(10,14,23,0.8)',
+      'text-halo-width': 1
+    }
+  });
+
+  // ── Interactions ──
+  map.on('click', 'entities', function (e) {
+    if (e.features.length > 0) {
+      showDetail(e.features[0].properties);
+    }
+  });
+
+  map.on('click', 'clusters', function (e) {
+    const clusterId = e.features[0].properties.cluster_id;
+    map.getSource('tracks').getClusterExpansionZoom(clusterId, function (err, zoom) {
+      if (err) return;
+      map.easeTo({ center: e.features[0].geometry.coordinates, zoom: zoom });
+    });
+  });
+
+  map.on('mouseenter', 'entities', function () { map.getCanvas().style.cursor = 'pointer'; });
+  map.on('mouseleave', 'entities', function () { map.getCanvas().style.cursor = ''; });
+  map.on('mouseenter', 'clusters', function () { map.getCanvas().style.cursor = 'pointer'; });
+  map.on('mouseleave', 'clusters', function () { map.getCanvas().style.cursor = ''; });
+
+  // Start refresh
+  refresh();
+  setInterval(refresh, 5000);
+});
+
+// ═══════════════ REFRESH ═══════════════
+async function refresh() {
+  try {
+    const center = map.getCenter();
+    const countryParam = state.activeCountry ? `&country=${state.activeCountry}` : '';
+    const url = `/api/tracks?lat=${center.lat.toFixed(2)}&lon=${center.lng.toFixed(2)}&radius_nm=250${countryParam}`;
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const data = await resp.json();
+
+    // Inject freshness (1.0 = fresh, 0.0 = stale >5min)
+    const now = Date.now();
+    if (data.features) {
+      for (let i = 0; i < data.features.length; i++) {
+        const p = data.features[i].properties;
+        const age = p.last_seen ? (now - new Date(p.last_seen).getTime()) / 1000 : 300;
+        p.freshness = Math.max(0, Math.min(1, 1 - (age / 300)));
+        if (!p.domain) p.domain = 'unknown';
+        if (!p.affiliation) p.affiliation = 'unknown';
+        if (p.threat_level === undefined) p.threat_level = 0;
+      }
+    }
+
+    // Apply layer filters
+    const filtered = applyLayerFilters(data);
+    map.getSource('tracks').setData(filtered);
+    state.lastData = data;
+
+    // Update counts
+    updateBadges(data);
+    updateThreats(data);
+    updateCountries(data);
+    document.getElementById('chip-tracks').textContent = (data.features || []).length.toLocaleString();
+
+    setLiveStatus(true);
+  } catch (err) {
+    console.error('Refresh failed:', err);
+    setLiveStatus(false);
+  }
+}
+
+function applyLayerFilters(data) {
+  if (!data || !data.features) return emptyGeoJSON;
+  const features = data.features.filter(function (f) {
+    const d = f.properties.domain;
+    if (!state.layerToggles.air && d === 'air') return false;
+    if (!state.layerToggles.sea && d === 'sea') return false;
+    if (!state.layerToggles.thr && f.properties.threat_level >= 4) return false;
+    return true;
+  });
+  return { type: 'FeatureCollection', features: features };
+}
+
+// ═══════════════ BADGES ═══════════════
+function updateBadges(data) {
+  if (!data || !data.features) return;
+  const features = data.features;
+  let air = 0, sea = 0, drone = 0, threat = 0;
+  for (let i = 0; i < features.length; i++) {
+    const p = features[i].properties;
+    if (p.domain === 'air') air++;
+    else if (p.domain === 'sea') sea++;
+    else if (p.domain === 'drone') drone++;
+    if (p.threat_level >= 4) threat++;
+  }
+  document.getElementById('count-air').textContent = air.toLocaleString();
+  document.getElementById('count-sea').textContent = sea.toLocaleString();
+  document.getElementById('count-drone').textContent = drone.toLocaleString();
+  document.getElementById('count-threat').textContent = threat.toLocaleString();
+}
+
+// ═══════════════ THREATS ═══════════════
+function updateThreats(data) {
+  if (!data || !data.features) return;
+  const threats = data.features
+    .filter(function (f) { return f.properties.threat_level >= 4; })
+    .sort(function (a, b) { return b.properties.threat_level - a.properties.threat_level; });
+
+  document.getElementById('threat-board-count').textContent = threats.length + ' ACTIVE';
+
+  const tbody = document.getElementById('threat-tbody');
+  let html = '';
+  for (let i = 0; i < threats.length; i++) {
+    const p = threats[i].properties;
+    const coords = threats[i].geometry.coordinates;
+    const sev = p.threat_level >= 8 ? 'critical' : p.threat_level >= 6 ? 'high' : p.threat_level >= 4 ? 'medium' : 'low';
+    const sevLabel = sev.toUpperCase();
+    html += '<tr onclick="zoomToEntity(' + coords[1] + ',' + coords[0] + ',\'' + (p.callsign || p.id || '') + '\')">'
+      + '<td>' + p.threat_level + '</td>'
+      + '<td>' + (p.callsign || p.id || 'UNK') + '</td>'
+      + '<td>' + (p.domain || '').toUpperCase() + '</td>'
+      + '<td>' + (p.affiliation || 'UNK').toUpperCase() + '</td>'
+      + '<td>' + (p.speed ? p.speed + 'kt' : '--') + '</td>'
+      + '<td class="sev-' + sev + '">' + sevLabel + '</td>'
+      + '<td>' + (p.threat_reason || '--') + '</td>'
+      + '<td>' + (coords ? coords[1].toFixed(2) + ',' + coords[0].toFixed(2) : '--') + '</td>'
+      + '</tr>';
+  }
+  tbody.innerHTML = html;
+}
+
+// ═══════════════ COUNTRIES ═══════════════
+function updateCountries(data) {
+  if (!data || !data.features) return;
+  const countryMap = {};
+  for (let i = 0; i < data.features.length; i++) {
+    const c = data.features[i].properties.country;
+    if (c) {
+      if (!countryMap[c]) countryMap[c] = 0;
+      countryMap[c]++;
+    }
+  }
+  const sorted = Object.keys(countryMap).sort();
+  state.countries = sorted.map(function (code) {
+    return { code: code, count: countryMap[code] };
+  });
+  renderCountries('');
+}
+
+function renderCountries(filter) {
+  const listEl = document.getElementById('country-list');
+  const lower = filter.toLowerCase();
+  let html = '';
+  for (let i = 0; i < state.countries.length; i++) {
+    const c = state.countries[i];
+    if (lower && c.code.toLowerCase().indexOf(lower) === -1) continue;
+    html += '<div class="country-item" onclick="selectCountry(\'' + c.code + '\')">'
+      + '<span>' + c.code + '</span>'
+      + '<span style="margin-left:auto;color:var(--text-muted);font-size:10px;">' + c.count + '</span>'
+      + '</div>';
+  }
+  listEl.innerHTML = html;
+}
+
+function filterCountries(val) {
+  renderCountries(val);
+}
+
+// ═══════════════ FOCUS / COUNTRY ═══════════════
+const FOCUS_REGIONS = [
+  { code: 'GLOBAL', label: 'GLOBAL', flag: '\u{1F310}' },
+  { code: 'CO', label: 'Colombia', flag: '\u{1F1E8}\u{1F1F4}' },
+  { code: 'PH', label: 'Philippines', flag: '\u{1F1F5}\u{1F1ED}' },
+  { code: 'EE', label: 'Estonia', flag: '\u{1F1EA}\u{1F1EA}' },
+  { code: 'GB', label: 'United Kingdom', flag: '\u{1F1EC}\u{1F1E7}' },
+  { code: 'FI', label: 'Finland', flag: '\u{1F1EB}\u{1F1EE}' },
+  { code: 'AU', label: 'Australia', flag: '\u{1F1E6}\u{1F1FA}' },
+  { code: 'JP', label: 'Japan', flag: '\u{1F1EF}\u{1F1F5}' }
+];
+
+function initFocusList() {
+  const el = document.getElementById('focus-list');
+  let html = '';
+  for (let i = 0; i < FOCUS_REGIONS.length; i++) {
+    const r = FOCUS_REGIONS[i];
+    html += '<div class="focus-item' + (i === 0 ? ' active' : '') + '" data-code="' + r.code + '" onclick="focusRegion(this)">'
+      + '<span class="fi-flag">' + r.flag + '</span>'
+      + '<span class="fi-label">' + r.label.toUpperCase() + '</span>'
+      + '</div>';
+  }
+  el.innerHTML = html;
+}
+
+async function focusRegion(el) {
+  document.querySelectorAll('.focus-item').forEach(function (e) { e.classList.remove('active'); });
+  el.classList.add('active');
+  const code = el.dataset.code;
+
+  if (code === 'GLOBAL') {
+    state.activeCountry = null;
+    document.getElementById('ctx-label').textContent = '';
+    map.flyTo({ center: [0, 20], zoom: 2 });
+  } else {
+    state.activeCountry = code;
+    document.getElementById('ctx-label').textContent = '\u2014 ' + (el.querySelector('.fi-label')?.textContent || code);
+    try {
+      const resp = await fetch('/api/country/' + code);
+      if (resp.ok) {
+        const info = await resp.json();
+        if (info.bounds) {
+          map.fitBounds(info.bounds, { padding: 50, maxZoom: 8 });
+        }
+      }
+    } catch (err) {
+      console.warn('Country bounds fetch failed:', err);
+    }
+  }
+  refresh();
+}
+
+async function selectCountry(code) {
+  state.activeCountry = code;
+  document.getElementById('ctx-label').textContent = '\u2014 ' + code;
+  try {
+    const resp = await fetch('/api/country/' + code);
+    if (resp.ok) {
+      const info = await resp.json();
+      if (info.bounds) {
+        map.fitBounds(info.bounds, { padding: 50, maxZoom: 8 });
+      }
+    }
+  } catch (err) {
+    console.warn('Country bounds fetch failed:', err);
+  }
+  refresh();
+}
+
+// ═══════════════ DETAIL PANEL ═══════════════
+function showDetail(props) {
+  state.selectedEntity = props;
+  document.getElementById('app').classList.add('detail-open');
+  document.getElementById('detail-title').textContent = props.callsign || props.id || 'UNKNOWN';
+
+  const affClass = 'aff-' + (props.affiliation || 'unknown');
+  const fields = [
+    ['ID', props.id || '--'],
+    ['Callsign', props.callsign || '--'],
+    ['Domain', (props.domain || '--').toUpperCase()],
+    ['Affiliation', '<span class="' + affClass + '">' + (props.affiliation || 'UNKNOWN').toUpperCase() + '</span>'],
+    ['Speed', props.speed ? props.speed + ' kt' : '--'],
+    ['Altitude', props.altitude ? props.altitude.toLocaleString() + ' ft' : '--'],
+    ['Heading', props.heading ? props.heading + '\u00B0' : '--'],
+    ['Country', props.country || '--'],
+    ['Source', props.source || '--'],
+    ['Last Seen', props.last_seen || '--']
+  ];
+
+  let html = '';
+  for (let i = 0; i < fields.length; i++) {
+    html += '<div class="detail-row"><span class="detail-key">' + fields[i][0] + '</span><span class="detail-val">' + fields[i][1] + '</span></div>';
+  }
+
+  if (props.threat_level >= 4) {
+    html += '<div class="detail-section-title">THREAT ASSESSMENT</div>';
+    const sev = props.threat_level >= 8 ? 'CRITICAL' : props.threat_level >= 6 ? 'HIGH' : 'MEDIUM';
+    const sevClass = props.threat_level >= 8 ? 'sev-critical' : props.threat_level >= 6 ? 'sev-high' : 'sev-medium';
+    html += '<div class="detail-row"><span class="detail-key">Level</span><span class="detail-val ' + sevClass + '">' + props.threat_level + ' / 10</span></div>';
+    html += '<div class="detail-row"><span class="detail-key">Severity</span><span class="detail-val ' + sevClass + '">' + sev + '</span></div>';
+    html += '<div class="detail-row"><span class="detail-key">Reason</span><span class="detail-val">' + (props.threat_reason || '--') + '</span></div>';
+  }
+
+  if (props.mmsi) html += '<div class="detail-row"><span class="detail-key">MMSI</span><span class="detail-val">' + props.mmsi + '</span></div>';
+  if (props.imo) html += '<div class="detail-row"><span class="detail-key">IMO</span><span class="detail-val">' + props.imo + '</span></div>';
+  if (props.icao) html += '<div class="detail-row"><span class="detail-key">ICAO</span><span class="detail-val">' + props.icao + '</span></div>';
+  if (props.squawk) html += '<div class="detail-row"><span class="detail-key">Squawk</span><span class="detail-val">' + props.squawk + '</span></div>';
+
+  document.getElementById('detail-body').innerHTML = html;
+}
+
+function closeDetail() {
+  document.getElementById('app').classList.remove('detail-open');
+  state.selectedEntity = null;
+}
+
+// ═══════════════ LAYER TOGGLES ═══════════════
+function toggleLayer(btn) {
+  const layer = btn.dataset.layer;
+  state.layerToggles[layer] = !state.layerToggles[layer];
+  btn.classList.toggle('on');
+  if (state.lastData) {
+    const filtered = applyLayerFilters(state.lastData);
+    map.getSource('tracks').setData(filtered);
+  }
+}
+
+// ═══════════════ THREAT BOARD TOGGLE ═══════════════
+function toggleThreats() {
+  const board = document.getElementById('threat-board');
+  const label = document.getElementById('threat-expand-label');
+  state.threatExpanded = !state.threatExpanded;
+  if (state.threatExpanded) {
+    board.classList.add('expanded');
+    label.innerHTML = '&#9650; COLLAPSE';
+  } else {
+    board.classList.remove('expanded');
+    label.innerHTML = '&#9660; EXPAND';
+  }
+}
+
+// ═══════════════ ZOOM TO ENTITY ═══════════════
+function zoomToEntity(lat, lon, callsign) {
+  map.flyTo({ center: [lon, lat], zoom: 10 });
+  // Try to find and select the entity
+  if (state.lastData && state.lastData.features) {
+    for (let i = 0; i < state.lastData.features.length; i++) {
+      const f = state.lastData.features[i];
+      if (f.properties.callsign === callsign || f.properties.id === callsign) {
+        showDetail(f.properties);
+        break;
+      }
+    }
+  }
+}
+
+// ═══════════════ LIVE STATUS ═══════════════
+function setLiveStatus(online) {
+  const dot = document.getElementById('live-dot');
+  const label = document.getElementById('live-label');
+  if (online) {
+    dot.style.background = 'var(--success)';
+    label.style.color = 'var(--success)';
+    label.textContent = 'LIVE';
+  } else {
+    dot.style.background = 'var(--danger)';
+    dot.style.animation = 'none';
+    label.style.color = 'var(--danger)';
+    label.textContent = 'OFFLINE';
+  }
+}
+
+// ═══════════════ UTC CLOCK ═══════════════
+function updateClock() {
+  const now = new Date();
+  const h = String(now.getUTCHours()).padStart(2, '0');
+  const m = String(now.getUTCMinutes()).padStart(2, '0');
+  const s = String(now.getUTCSeconds()).padStart(2, '0');
+  document.getElementById('utc-clock').textContent = h + ':' + m + ':' + s + 'Z';
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ═══════════════ INIT ═══════════════
+initFocusList();
+</script>
+</body>
+</html>
