@@ -101,6 +101,16 @@ def main() -> None:
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
         help="Logging level",
     )
+    parser.add_argument(
+        "--no-json-logs",
+        action="store_true",
+        help="Use human-readable logs instead of JSON",
+    )
+    parser.add_argument(
+        "--log-file",
+        default=None,
+        help="Log file path (enables file logging with rotation)",
+    )
 
     args = parser.parse_args()
 
@@ -121,6 +131,8 @@ def main() -> None:
         classify_interval_s=args.classify_interval,
         output_interval_s=args.output_interval,
         log_level=args.log_level,
+        json_logs=not args.no_json_logs,
+        log_file=args.log_file,
         db_url=args.db_url,
     )
 

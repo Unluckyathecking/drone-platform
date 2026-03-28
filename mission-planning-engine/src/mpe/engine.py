@@ -57,6 +57,8 @@ class EngineConfig:
     output_interval_s: float = 5.0
     purge_interval_s: float = 60.0
     log_level: str = "INFO"
+    json_logs: bool = True
+    log_file: str | None = None
 
     # Database (optional -- engine works without PostgreSQL)
     db_url: str | None = None  # e.g. "postgresql+asyncpg://mpe:mpe@localhost:5432/mpe_c2"
@@ -147,10 +149,12 @@ class CoreEngine:
             "uptime_start": None,
         }
 
-        logging.basicConfig(
-            level=getattr(logging, self._config.log_level),
-            format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
-            datefmt="%Y-%m-%dT%H:%M:%S",
+        from mpe.log_config import configure_logging
+
+        configure_logging(
+            level=self._config.log_level,
+            json_output=self._config.json_logs,
+            log_file=self._config.log_file,
         )
 
     # -- properties ---------------------------------------------------------

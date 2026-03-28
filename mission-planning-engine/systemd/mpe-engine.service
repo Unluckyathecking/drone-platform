@@ -1,0 +1,18 @@
+[Unit]
+Description=MPE C2 Intelligence Engine
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=mpe
+WorkingDirectory=/opt/mpe
+ExecStart=/opt/mpe/.venv/bin/python -m mpe --cot-url udp+wo://239.2.3.1:6969
+Restart=always
+RestartSec=5
+Environment=PYTHONPATH=/opt/mpe/src
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
