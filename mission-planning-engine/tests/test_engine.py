@@ -11,6 +11,7 @@ Tests cover:
 
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
@@ -460,3 +461,153 @@ class TestSetupSources:
         engine._setup_sources()
 
         assert len(engine._sources) == 0
+
+
+# ---------------------------------------------------------------------------
+# Database persistence tests (no actual PostgreSQL required)
+# ---------------------------------------------------------------------------
+
+
+class TestDatabaseConfig:
+    """Test EngineConfig database fields and CoreEngine DB integration."""
+
+    def test_db_disabled_by_default(self) -> None:
+        config = EngineConfig()
+
+        assert config.db_url is None
+        assert config.db_enabled is False
+
+    def test_db_url_configurable(self) -> None:
+        url = "postgresql+asyncpg://mpe:mpe@localhost:5432/mpe_c2"
+        config = EngineConfig(db_url=url)
+
+        assert config.db_url == url
+        assert config.db_enabled is False  # Not enabled until connected
+
+    def test_engine_db_none_by_default(self) -> None:
+        engine = CoreEngine()
+
+        assert engine._db is None
+        assert engine._pending_db_ops == []
+
+    def test_pending_db_ops_starts_empty(self) -> None:
+        engine = CoreEngine(EngineConfig(db_url="postgresql+asyncpg://x:x@localhost/test"))
+
+        assert engine._pending_db_ops == []
+        assert engine._db is None  # Not connected until start()
+
+
+class TestDbOpsQueue:
+    """Test that DB operations are queued during classification."""
+
+    def test_no_db_ops_without_db(self) -> None:
+        """Without a DB configured, no ops should be queued."""
+        engine = CoreEngine(EngineConfig(
+            adsb_enabled=False, ais_enabled=False, cot_enabled=False,
+        ))
+
+        engine.aircraft_tracker.update(
+            icao_hex="AABBCC", latitude=51.5, longitude=-0.1,
+            altitude_baro_ft=35000, callsign="TEST1",
+        )
+
+        engine._classify_all()
+
+        assert len(engine._pending_db_ops) == 0
+
+    def test_ops_queued_with_db(self) -> None:
+        """With a DB object set, classify should queue persistence ops."""
+        engine = CoreEngine(EngineConfig(
+            adsb_enabled=False, ais_enabled=False, cot_enabled=False,
+        ))
+        # Simulate DB being available (set a truthy sentinel)
+        engine._db = object()
+
+        engine.aircraft_tracker.update(
+            icao_hex="AABBCC", latitude=51.5, longitude=-0.1,
+            altitude_baro_ft=35000, callsign="TEST1",
+        )
+
+        engine._classify_all()
+
+        # Should have queued at least track + classification ops
+        assert len(engine._pending_db_ops) >= 2
+
+    def test_ops_queued_for_vessels_with_db(self) -> None:
+        """Vessel classification should also queue DB ops."""
+        engine = CoreEngine(EngineConfig(
+            adsb_enabled=False, ais_enabled=False, cot_enabled=False,
+        ))
+        engine._db = object()
+
+        engine.vessel_tracker.update(
+            mmsi=211000001, latitude=51.0, longitude=1.0,
+            speed_over_ground=12.0, ship_type=70, vessel_name="CARGO ONE",
+        )
+
+        engine._classify_all()
+
+        assert len(engine._pending_db_ops) >= 2
+
+    def test_alert_ops_queued_for_high_threat(self) -> None:
+        """High-threat classification should queue alert persistence."""
+        config = EngineConfig(
+            adsb_enabled=False, ais_enabled=False, cot_enabled=False,
+            known_hostile_mmsis={999000001},
+        )
+        engine = CoreEngine(config)
+        engine._db = object()
+
+        engine.vessel_tracker.update(
+            mmsi=999000001, latitude=25.0, longitude=55.0,
+            speed_over_ground=8.0,
+        )
+
+        engine._classify_all()
+
+        # track + classification + alert = at least 3 ops
+        assert len(engine._pending_db_ops) >= 3
+
+    def test_ops_queued_for_emergency_squawk(self) -> None:
+        """Emergency squawk aircraft should queue alert persistence."""
+        engine = CoreEngine(EngineConfig(
+            adsb_enabled=False, ais_enabled=False, cot_enabled=False,
+        ))
+        engine._db = object()
+
+        engine.aircraft_tracker.update(
+            icao_hex="ABCDEF", latitude=51.5, longitude=-0.1,
+            altitude_baro_ft=10000, squawk="7700", callsign="MAYDAY",
+        )
+
+        engine._classify_all()
+
+        # track + classification + alert = at least 3 ops
+        assert len(engine._pending_db_ops) >= 3
+
+
+class TestFlushDbOps:
+    """Test _flush_db_ops edge cases."""
+
+    def test_flush_noop_without_db(self) -> None:
+        """Flush with no DB should be a no-op."""
+        engine = CoreEngine(EngineConfig(
+            adsb_enabled=False, ais_enabled=False, cot_enabled=False,
+        ))
+        engine._pending_db_ops.append(lambda s: None)
+
+        asyncio.run(engine._flush_db_ops())
+
+        # Ops remain because DB is None (they aren't executed)
+        assert len(engine._pending_db_ops) == 1
+
+    def test_flush_clears_queue_with_empty_ops(self) -> None:
+        """Flush with DB but empty queue should be a no-op."""
+        engine = CoreEngine(EngineConfig(
+            adsb_enabled=False, ais_enabled=False, cot_enabled=False,
+        ))
+        engine._db = object()
+
+        asyncio.run(engine._flush_db_ops())
+
+        assert len(engine._pending_db_ops) == 0

@@ -75,6 +75,13 @@ def main() -> None:
         help="Engine callsign",
     )
 
+    # Database (optional)
+    parser.add_argument(
+        "--db-url",
+        default=None,
+        help="PostgreSQL URL for persistence (optional, e.g. postgresql+asyncpg://mpe:mpe@localhost:5432/mpe_c2)",
+    )
+
     # Engine
     parser.add_argument(
         "--classify-interval",
@@ -114,6 +121,7 @@ def main() -> None:
         classify_interval_s=args.classify_interval,
         output_interval_s=args.output_interval,
         log_level=args.log_level,
+        db_url=args.db_url,
     )
 
     asyncio.run(run_engine(config))

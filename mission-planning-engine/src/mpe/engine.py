@@ -58,6 +58,10 @@ class EngineConfig:
     purge_interval_s: float = 60.0
     log_level: str = "INFO"
 
+    # Database (optional -- engine works without PostgreSQL)
+    db_url: str | None = None  # e.g. "postgresql+asyncpg://mpe:mpe@localhost:5432/mpe_c2"
+    db_enabled: bool = False
+
 
 class IngestSource(Protocol):
     """Protocol for data ingest sources."""
@@ -109,6 +113,10 @@ class CoreEngine:
         self._ais_bridge = AISCoTBridge(
             stale_seconds=self._config.cot_stale_seconds,
         )
+
+        # Database (optional persistence layer)
+        self._db = None  # Optional Database instance
+        self._pending_db_ops: list = []  # Queue of async callables to run
 
         # Stats
         self._stats: dict[str, object] = {
@@ -198,6 +206,26 @@ class CoreEngine:
 
         logger.info("Started %d ingest source(s)", len(self._sources))
 
+        # Setup optional database persistence
+        if self._config.db_url:
+            try:
+                from mpe.db.engine import Database
+
+                self._db = Database(self._config.db_url)
+                await self._db.connect()
+                await self._db.create_tables()
+                self._config.db_enabled = True
+                logger.info(
+                    "Database connected: %s",
+                    self._config.db_url.split("@")[-1],
+                )
+            except Exception as exc:
+                logger.warning(
+                    "Database unavailable, running in-memory only: %s", exc,
+                )
+                self._db = None
+                self._config.db_enabled = False
+
         # Setup CoT output
         cot_sender = None
         if self._config.cot_enabled:
@@ -225,6 +253,7 @@ class CoreEngine:
                 # Classify
                 if now - last_classify >= self._config.classify_interval_s:
                     self._classify_all()
+                    await self._flush_db_ops()
                     last_classify = now
 
                 # Output CoT
@@ -261,7 +290,142 @@ class CoreEngine:
         self._running = False
         for source in self._sources:
             source.stop()
+
+        # Flush remaining DB operations and disconnect
+        if self._db:
+            await self._flush_db_ops()
+            await self._db.disconnect()
+            logger.info("Database disconnected")
+
         logger.info("Engine stopped.")
+
+    # -- database persistence -----------------------------------------------
+
+    async def _flush_db_ops(self) -> None:
+        """Execute pending database operations in a single transaction."""
+        if not self._db or not self._pending_db_ops:
+            return
+        ops = self._pending_db_ops[:]
+        self._pending_db_ops.clear()
+        try:
+            async with self._db.session() as session:
+                for op in ops:
+                    try:
+                        await op(session)
+                    except Exception as exc:
+                        logger.error("DB operation failed: %s", exc)
+                await session.commit()
+        except Exception as exc:
+            logger.error("DB flush failed: %s", exc)
+
+    def _queue_track_persist(
+        self, entity_id: str, domain: str, track: object,
+    ) -> None:
+        """Queue a track position write for the next DB flush."""
+        lat = getattr(track, "latitude", 0.0)
+        lon = getattr(track, "longitude", 0.0)
+        alt = getattr(track, "altitude_baro_ft", None) or getattr(
+            track, "altitude_m", 0.0,
+        )
+        heading = getattr(track, "heading", 0.0) or getattr(
+            track, "course_over_ground", 0.0,
+        ) or 0.0
+        speed = getattr(track, "ground_speed_kts", None) or getattr(
+            track, "speed_over_ground", 0.0,
+        ) or 0.0
+        source = "adsb" if domain == "air" else "ais"
+
+        async def persist_track(
+            session,
+            eid=entity_id,
+            _lat=lat,
+            _lon=lon,
+            _alt=alt,
+            _heading=heading,
+            _speed=speed,
+            _source=source,
+        ):
+            from mpe.db.repository import TrackRepository
+
+            repo = TrackRepository(session)
+            await repo.record_update(
+                eid,
+                source=_source,
+                lat=_lat,
+                lon=_lon,
+                alt=_alt,
+                heading=_heading,
+                speed_mps=_speed,
+            )
+
+        self._pending_db_ops.append(persist_track)
+
+    def _queue_classification_persist(
+        self, entity_id: str, domain: str, cls: object,
+    ) -> None:
+        """Queue a classification write for the next DB flush."""
+
+        async def persist_cls(session, eid=entity_id, d=domain, c=cls):
+            from mpe.db.models import Classification as DBClassification
+            from mpe.db.repository import EntityRepository
+
+            # Upsert entity with latest classification
+            entity_repo = EntityRepository(session)
+            await entity_repo.upsert(
+                eid,
+                domain=d,
+                affiliation=c.affiliation,
+                threat_level=c.threat_level,
+                threat_category=c.threat_category,
+                confidence=c.confidence,
+            )
+
+            # Record classification history
+            db_cls = DBClassification(
+                entity_id=eid,
+                affiliation=c.affiliation,
+                threat_level=c.threat_level,
+                threat_category=c.threat_category,
+                confidence=c.confidence,
+                reasoning=[str(r) for r in c.reasoning],
+                anomalies=[
+                    {"type": a.anomaly_type, "description": a.description}
+                    for a in c.anomalies
+                ],
+            )
+            session.add(db_cls)
+
+        self._pending_db_ops.append(persist_cls)
+
+    def _queue_alert_persist(
+        self, entity_id: str, cls: object,
+    ) -> None:
+        """Queue an alert + audit log write for the next DB flush."""
+
+        async def persist_alert(session, eid=entity_id, c=cls):
+            from mpe.db.repository import AlertRepository, AuditRepository
+
+            alert_repo = AlertRepository(session)
+            await alert_repo.create_alert(
+                entity_id=eid,
+                alert_type="threat",
+                severity=c.threat_level,
+                title=f"High threat: {eid}",
+                description="; ".join(str(r) for r in c.reasoning),
+            )
+
+            audit_repo = AuditRepository(session)
+            await audit_repo.log(
+                action="alert_generated",
+                target_type="entity",
+                target_id=eid,
+                details={
+                    "threat_level": c.threat_level,
+                    "reasoning": [str(r) for r in c.reasoning],
+                },
+            )
+
+        self._pending_db_ops.append(persist_alert)
 
     # -- periodic tasks -----------------------------------------------------
 
@@ -275,6 +439,12 @@ class CoreEngine:
             track._classification = cls  # noqa: SLF001
             count += 1
 
+            # Queue DB persistence (no-op if DB not configured)
+            if self._db:
+                entity_id = f"ADSB-{track.icao_hex}"
+                self._queue_track_persist(entity_id, "air", track)
+                self._queue_classification_persist(entity_id, "air", cls)
+
             # Check for alerts
             if cls.threat_level >= 7:
                 logger.warning(
@@ -287,11 +457,19 @@ class CoreEngine:
                 self._stats["alerts_generated"] = (
                     int(self._stats.get("alerts_generated", 0)) + 1
                 )
+                if self._db:
+                    self._queue_alert_persist(entity_id, cls)
 
         for track in self._vessel_tracker.active_tracks:
             cls = self._classifier.classify_vessel(track)
             track._classification = cls  # noqa: SLF001
             count += 1
+
+            # Queue DB persistence (no-op if DB not configured)
+            if self._db:
+                entity_id = f"AIS-{track.mmsi}"
+                self._queue_track_persist(entity_id, "sea", track)
+                self._queue_classification_persist(entity_id, "sea", cls)
 
             if cls.threat_level >= 7:
                 logger.warning(
@@ -304,6 +482,8 @@ class CoreEngine:
                 self._stats["alerts_generated"] = (
                     int(self._stats.get("alerts_generated", 0)) + 1
                 )
+                if self._db:
+                    self._queue_alert_persist(entity_id, cls)
 
         self._stats["classifications_run"] = (
             int(self._stats.get("classifications_run", 0)) + count
