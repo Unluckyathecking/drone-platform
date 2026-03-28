@@ -64,6 +64,9 @@ class EngineConfig:
     db_url: str | None = None  # e.g. "postgresql+asyncpg://mpe:mpe@localhost:5432/mpe_c2"
     db_enabled: bool = False
 
+    # LLM intelligence (optional -- falls back to templates)
+    anthropic_api_key: str | None = None  # For LLM features
+
 
 class IngestSource(Protocol):
     """Protocol for data ingest sources."""

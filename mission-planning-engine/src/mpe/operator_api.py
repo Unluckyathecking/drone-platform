@@ -10,11 +10,14 @@ These endpoints allow operators to:
 
 from __future__ import annotations
 
+import os
 from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
+
+from mpe.intelligence import IntelligenceEngine
 
 router = APIRouter(prefix="/api/operator", tags=["operator"])
 
@@ -280,6 +283,69 @@ async def health_check():
             1 for a in _alert_history if not a.get("acknowledged")
         ),
     }
+
+
+# -- LLM-powered intelligence endpoints -------------------------------------
+
+
+def _get_intel_engine() -> IntelligenceEngine:
+    """Get or create the intelligence engine."""
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    return IntelligenceEngine(api_key=api_key)
+
+
+@router.get("/sitrep/narrative")
+async def generate_narrative_sitrep(
+    format: str = Query("nato", description="nato, flash, or brief"),
+):
+    """Generate a narrative SITREP using LLM (or template fallback)."""
+    raw = await generate_sitrep()
+    sitrep_data = raw.get("sitrep", {})
+
+    intel = _get_intel_engine()
+    narrative = await intel.generate_sitrep(sitrep_data, format=format)
+
+    return {
+        "format": format,
+        "narrative": narrative,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "llm_available": intel.is_available,
+    }
+
+
+@router.post("/query")
+async def natural_language_query(body: dict):
+    """Natural language query against the operational picture."""
+    query = body.get("query", "")
+    if not query:
+        raise HTTPException(status_code=400, detail="Missing 'query' field")
+
+    intel = _get_intel_engine()
+
+    # Try to get a TrackManager from the running server
+    tm = None
+    try:
+        from mpe.server import track_manager as _tm
+
+        tm = _tm
+    except (ImportError, AttributeError):
+        pass
+
+    # Fall back to building one from aircraft/vessel trackers
+    if tm is None:
+        try:
+            from mpe.track_manager import TrackManager
+
+            tm = TrackManager()
+        except ImportError:
+            pass
+
+    if tm is not None:
+        result = await intel.natural_language_query(query, tm)
+    else:
+        result = {"answer": "Track manager not available", "count": 0}
+
+    return result
 
 
 # -- Helper to register alerts from the engine -------------------------------

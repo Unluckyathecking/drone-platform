@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import os
 
 from mpe.engine import EngineConfig, run_engine
 
@@ -112,10 +113,20 @@ def main() -> None:
         help="Log file path (enables file logging with rotation)",
     )
 
+    # LLM intelligence (optional)
+    parser.add_argument(
+        "--anthropic-key",
+        default=None,
+        help="Anthropic API key for LLM features",
+    )
+
     args = parser.parse_args()
 
     # Parse center coordinates
     lat, lon = (float(x) for x in args.adsb_center.split(","))
+
+    # Resolve Anthropic API key: CLI flag > environment variable
+    anthropic_key = args.anthropic_key or os.environ.get("ANTHROPIC_API_KEY")
 
     config = EngineConfig(
         adsb_enabled=not args.no_adsb,
@@ -134,6 +145,7 @@ def main() -> None:
         json_logs=not args.no_json_logs,
         log_file=args.log_file,
         db_url=args.db_url,
+        anthropic_api_key=anthropic_key,
     )
 
     asyncio.run(run_engine(config))
