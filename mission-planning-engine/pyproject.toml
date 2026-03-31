@@ -27,3 +27,7 @@ mpe = "mpe.cli:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "live: marks tests that hit external networks (skip in CI with -m 'not live')",
+]
+asyncio_mode = "strict"
