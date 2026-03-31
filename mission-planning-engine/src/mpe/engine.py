@@ -64,6 +64,15 @@ class EngineConfig:
     db_url: str | None = None  # e.g. "postgresql+asyncpg://mpe:mpe@localhost:5432/mpe_c2"
     db_enabled: bool = False
 
+    # Geofence (optional -- loads demo zones by default)
+    geofence_enabled: bool = True
+    geofence_load_demo_zones: bool = True
+
+    # Trajectory predictor (optional)
+    predictor_enabled: bool = True
+    predictor_hours: float = 6.0
+    predictor_min_speed_mps: float = 1.0  # Don't predict for stationary entities
+
     # LLM intelligence (optional -- falls back to templates)
     anthropic_api_key: str | None = None  # For LLM features
 
@@ -134,6 +143,21 @@ class CoreEngine:
 
         self._alert_engine = AlertEngine()
         self._pending_alert_cots: list[str] = []
+
+        # Geofence manager
+        from mpe.geofence import GeofenceManager
+
+        self._geofence_manager = GeofenceManager()
+        if self._config.geofence_enabled and self._config.geofence_load_demo_zones:
+            from mpe.geofence import DEMO_ZONES
+
+            for zone in DEMO_ZONES:
+                self._geofence_manager.add_zone(zone)
+
+        # Trajectory predictor
+        from mpe.predictor import TrajectoryPredictor
+
+        self._predictor = TrajectoryPredictor()
 
         # CoT output (plain socket sender, wired in start())
         self._cot_output = None  # CoTOutput instance
@@ -580,6 +604,41 @@ class CoreEngine:
                 if self._db:
                     self._queue_alert_persist(entity_id, cls)
 
+            # Geofence check
+            if self._config.geofence_enabled:
+                violations = self._geofence_manager.check(
+                    entity_id=entity_id,
+                    lat=track.latitude,
+                    lon=track.longitude,
+                    domain="air",
+                )
+                for v in violations:
+                    logger.warning("GEOFENCE: %s", v.message)
+                    self._pending_alert_cots.append(
+                        self._geofence_violation_to_cot(v, callsign=track.callsign or track.icao_hex),
+                    )
+                    self._stats["alerts_generated"] = (
+                        int(self._stats.get("alerts_generated", 0)) + 1
+                    )
+
+            # Trajectory prediction -- proactive geofence entry warning
+            if (
+                self._config.predictor_enabled
+                and getattr(track, "speed_mps", 0.0) >= self._config.predictor_min_speed_mps
+            ):
+                entry = self._predictor.predict_geofence_entry(
+                    track,
+                    self._geofence_manager,
+                    max_hours=self._config.predictor_hours,
+                )
+                if entry:
+                    logger.info(
+                        "PREDICTED GEOFENCE ENTRY: %s → %s in %.0f min",
+                        entity_id,
+                        entry["zone"],
+                        entry["minutes_until"],
+                    )
+
             # Legacy high-threat logging (kept for backwards compatibility)
             if cls.threat_level >= 7:
                 logger.warning(
@@ -619,6 +678,41 @@ class CoreEngine:
                 if self._db:
                     self._queue_alert_persist(entity_id, cls)
 
+            # Geofence check
+            if self._config.geofence_enabled:
+                violations = self._geofence_manager.check(
+                    entity_id=entity_id,
+                    lat=track.latitude,
+                    lon=track.longitude,
+                    domain="sea",
+                )
+                for v in violations:
+                    logger.warning("GEOFENCE: %s", v.message)
+                    self._pending_alert_cots.append(
+                        self._geofence_violation_to_cot(v, callsign=track.vessel_name or str(track.mmsi)),
+                    )
+                    self._stats["alerts_generated"] = (
+                        int(self._stats.get("alerts_generated", 0)) + 1
+                    )
+
+            # Trajectory prediction -- proactive geofence entry warning
+            if (
+                self._config.predictor_enabled
+                and getattr(track, "speed_mps", 0.0) >= self._config.predictor_min_speed_mps
+            ):
+                entry = self._predictor.predict_geofence_entry(
+                    track,
+                    self._geofence_manager,
+                    max_hours=self._config.predictor_hours,
+                )
+                if entry:
+                    logger.info(
+                        "PREDICTED GEOFENCE ENTRY: %s → %s in %.0f min",
+                        entity_id,
+                        entry["zone"],
+                        entry["minutes_until"],
+                    )
+
             if cls.threat_level >= 7:
                 logger.warning(
                     "HIGH THREAT: %s threat=%d %s reason=%s",
@@ -631,6 +725,39 @@ class CoreEngine:
         self._stats["classifications_run"] = (
             int(self._stats.get("classifications_run", 0)) + count
         )
+
+    @staticmethod
+    def _geofence_violation_to_cot(violation, callsign: str = "") -> str:
+        """Build a minimal CoT alert event for a geofence violation."""
+        import uuid
+        import xml.etree.ElementTree as ET
+        from datetime import datetime, timezone
+
+        now = datetime.now(timezone.utc)
+        stale = now.replace(year=now.year + 1)
+        fmt = "%Y-%m-%dT%H:%M:%S.000Z"
+
+        root = ET.Element("event")
+        root.set("version", "2.0")
+        root.set("uid", f"mpe-geofence-{uuid.uuid4().hex[:8]}")
+        root.set("type", "b-a-o-tbl")  # Warning/alert
+        root.set("time", now.strftime(fmt))
+        root.set("start", now.strftime(fmt))
+        root.set("stale", stale.strftime(fmt))
+        root.set("how", "m-g")
+
+        point = ET.SubElement(root, "point")
+        point.set("lat", str(round(violation.latitude, 6)))
+        point.set("lon", str(round(violation.longitude, 6)))
+        point.set("hae", "0")
+        point.set("ce", "9999999")
+        point.set("le", "9999999")
+
+        detail = ET.SubElement(root, "detail")
+        remarks = ET.SubElement(detail, "remarks")
+        remarks.text = violation.message
+
+        return ET.tostring(root, encoding="unicode", xml_declaration=False)
 
     @staticmethod
     def _override_cot_affiliation(xml_str: str, affiliation: str) -> str:

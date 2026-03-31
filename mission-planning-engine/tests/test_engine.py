@@ -475,6 +475,7 @@ class TestAlertEngineIntegration:
             adsb_enabled=False,
             ais_enabled=False,
             cot_enabled=False,
+            geofence_enabled=False,  # Disable geofence so only classifier alerts are tested
         ))
 
         engine.aircraft_tracker.update(
@@ -489,7 +490,7 @@ class TestAlertEngineIntegration:
 
         engine._classify_all()
 
-        # Neutral civilian aircraft should not trigger alerts
+        # Neutral civilian aircraft should not trigger classifier-based alerts
         assert len(engine._pending_alert_cots) == 0
 
     def test_pending_alert_cots_starts_empty(self) -> None:
@@ -789,3 +790,202 @@ class TestFlushDbOps:
         asyncio.run(engine._flush_db_ops())
 
         assert len(engine._pending_db_ops) == 0
+
+
+# ---------------------------------------------------------------------------
+# Geofence wiring tests
+# ---------------------------------------------------------------------------
+
+
+class TestGeofenceWiring:
+    """Test that GeofenceManager is wired into the engine classify loop."""
+
+    def test_geofence_manager_initialized(self) -> None:
+        engine = CoreEngine()
+        assert engine._geofence_manager is not None
+
+    def test_demo_zones_loaded_by_default(self) -> None:
+        engine = CoreEngine(EngineConfig(
+            adsb_enabled=False, ais_enabled=False, cot_enabled=False,
+        ))
+        assert len(engine._geofence_manager.zones) == 4  # DEMO_ZONES has 4 entries
+
+    def test_no_demo_zones_when_disabled(self) -> None:
+        engine = CoreEngine(EngineConfig(
+            adsb_enabled=False, ais_enabled=False, cot_enabled=False,
+            geofence_load_demo_zones=False,
+        ))
+        assert len(engine._geofence_manager.zones) == 0
+
+    def test_geofence_disabled_flag_skips_check(self) -> None:
+        """When geofence_enabled=False, no geofence alerts are generated."""
+        engine = CoreEngine(EngineConfig(
+            adsb_enabled=False, ais_enabled=False, cot_enabled=False,
+            geofence_enabled=False,
+        ))
+        # Place track inside STRAIT_OF_HORMUZ alert zone
+        engine.vessel_tracker.update(
+            mmsi=100000001,
+            latitude=26.0,
+            longitude=56.5,
+            speed_over_ground=5.0,
+        )
+
+        engine._classify_all()
+
+        # Geofence disabled -- no geofence alerts
+        assert len(engine._pending_alert_cots) == 0
+
+    def test_aircraft_in_alert_zone_generates_cot(self) -> None:
+        """Aircraft inside an alert zone should generate a CoT alert."""
+        engine = CoreEngine(EngineConfig(
+            adsb_enabled=False, ais_enabled=False, cot_enabled=False,
+            geofence_enabled=True,
+            geofence_load_demo_zones=False,
+        ))
+
+        from mpe.geofence import GeofenceZone
+        engine._geofence_manager.add_zone(GeofenceZone(
+            name="TEST_ALERT",
+            zone_type="alert",
+            polygon=[(51.0, -1.0), (52.0, -1.0), (52.0, 0.0), (51.0, 0.0)],
+            priority=5,
+        ))
+
+        engine.aircraft_tracker.update(
+            icao_hex="AA0001",
+            latitude=51.5,
+            longitude=-0.5,
+        )
+
+        engine._classify_all()
+
+        assert int(engine.stats["alerts_generated"]) >= 1
+        assert len(engine._pending_alert_cots) >= 1
+        # Verify it's a CoT alert event
+        cot = engine._pending_alert_cots[0]
+        assert "b-a-o-tbl" in cot
+        assert "TEST_ALERT" in cot
+
+    def test_vessel_in_keep_out_zone_generates_cot(self) -> None:
+        """Vessel inside a keep-out zone should generate a CoT alert."""
+        engine = CoreEngine(EngineConfig(
+            adsb_enabled=False, ais_enabled=False, cot_enabled=False,
+            geofence_enabled=True,
+            geofence_load_demo_zones=False,
+        ))
+
+        from mpe.geofence import GeofenceZone
+        engine._geofence_manager.add_zone(GeofenceZone(
+            name="EXCLUSION",
+            zone_type="keep_out",
+            polygon=[(25.0, 55.0), (27.0, 55.0), (27.0, 57.0), (25.0, 57.0)],
+            priority=8,
+        ))
+
+        engine.vessel_tracker.update(
+            mmsi=200000001,
+            latitude=26.0,
+            longitude=56.0,
+            speed_over_ground=5.0,
+        )
+
+        engine._classify_all()
+
+        assert int(engine.stats["alerts_generated"]) >= 1
+        assert len(engine._pending_alert_cots) >= 1
+        cot = engine._pending_alert_cots[0]
+        assert "EXCLUSION" in cot
+
+    def test_geofence_cot_is_valid_xml(self) -> None:
+        """Geofence violation CoT should be parseable XML."""
+        import xml.etree.ElementTree as ET
+
+        engine = CoreEngine(EngineConfig(
+            adsb_enabled=False, ais_enabled=False, cot_enabled=False,
+            geofence_enabled=True,
+            geofence_load_demo_zones=False,
+        ))
+
+        from mpe.geofence import GeofenceZone
+        engine._geofence_manager.add_zone(GeofenceZone(
+            name="XML_TEST",
+            zone_type="alert",
+            polygon=[(51.0, -1.0), (52.0, -1.0), (52.0, 0.0), (51.0, 0.0)],
+        ))
+
+        engine.aircraft_tracker.update(
+            icao_hex="BB0001",
+            latitude=51.5,
+            longitude=-0.5,
+        )
+        engine._classify_all()
+
+        assert len(engine._pending_alert_cots) >= 1
+        root = ET.fromstring(engine._pending_alert_cots[0])
+        assert root.tag == "event"
+        assert root.get("type") == "b-a-o-tbl"
+        point = root.find("point")
+        assert point is not None
+        assert float(point.get("lat")) == pytest.approx(51.5, abs=0.01)
+
+
+# ---------------------------------------------------------------------------
+# Predictor wiring tests
+# ---------------------------------------------------------------------------
+
+
+class TestPredictorWiring:
+    """Test that TrajectoryPredictor is wired into the engine classify loop."""
+
+    def test_predictor_initialized(self) -> None:
+        engine = CoreEngine()
+        assert engine._predictor is not None
+
+    def test_predictor_disabled_flag(self) -> None:
+        """When predictor_enabled=False, no prediction code runs (no exceptions)."""
+        engine = CoreEngine(EngineConfig(
+            adsb_enabled=False, ais_enabled=False, cot_enabled=False,
+            geofence_enabled=False,
+            predictor_enabled=False,
+        ))
+
+        engine.aircraft_tracker.update(
+            icao_hex="AA1111",
+            latitude=51.5,
+            longitude=-0.1,
+            altitude_baro_ft=5000,
+            ground_speed_kts=100,
+        )
+
+        # Should not raise
+        engine._classify_all()
+        assert int(engine.stats["classifications_run"]) == 1
+
+    def test_stationary_entity_skips_prediction(self) -> None:
+        """Entities below min_speed_mps threshold skip prediction."""
+        engine = CoreEngine(EngineConfig(
+            adsb_enabled=False, ais_enabled=False, cot_enabled=False,
+            geofence_enabled=False,
+            predictor_enabled=True,
+            predictor_min_speed_mps=5.0,  # High threshold
+        ))
+
+        # Vessel with 0 speed
+        engine.vessel_tracker.update(
+            mmsi=300000001,
+            latitude=26.0,
+            longitude=56.0,
+            speed_over_ground=0.0,  # 0 knots = 0 m/s
+        )
+
+        engine._classify_all()  # Should not raise
+        assert int(engine.stats["classifications_run"]) == 1
+
+    def test_config_predictor_hours_field(self) -> None:
+        config = EngineConfig(predictor_hours=12.0)
+        assert config.predictor_hours == 12.0
+
+    def test_config_predictor_min_speed_field(self) -> None:
+        config = EngineConfig(predictor_min_speed_mps=2.5)
+        assert config.predictor_min_speed_mps == 2.5
