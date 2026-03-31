@@ -13,13 +13,21 @@ from __future__ import annotations
 import os
 from datetime import datetime, timezone
 from typing import Optional
+from uuid import uuid4
 
-from fastapi import APIRouter, HTTPException, Query
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
+from mpe.auth import CurrentUser, require_operator, require_viewer
 from mpe.intelligence import IntelligenceEngine
 
 router = APIRouter(prefix="/api/operator", tags=["operator"])
+
+# Shorthand dependency aliases used in signatures
+_Viewer   = Annotated[CurrentUser, Depends(require_viewer)]
+_Operator = Annotated[CurrentUser, Depends(require_operator)]
 
 
 # -- Request/Response Models --------------------------------------------------
@@ -57,7 +65,7 @@ _alert_history: list[dict] = []
 
 
 @router.post("/watchlist")
-async def add_to_watchlist(entry: WatchlistEntry):
+async def add_to_watchlist(entry: WatchlistEntry, _user: _Operator):
     """Add an entity to the friendly or hostile watchlist."""
     key = f"{entry.identifier_type}:{entry.identifier}"
     _watchlist[key] = entry
@@ -70,7 +78,7 @@ async def add_to_watchlist(entry: WatchlistEntry):
 
 
 @router.delete("/watchlist/{identifier_type}/{identifier}")
-async def remove_from_watchlist(identifier_type: str, identifier: str):
+async def remove_from_watchlist(identifier_type: str, identifier: str, _user: _Operator):
     """Remove an entity from the watchlist."""
     key = f"{identifier_type}:{identifier}"
     if key not in _watchlist:
@@ -80,7 +88,7 @@ async def remove_from_watchlist(identifier_type: str, identifier: str):
 
 
 @router.get("/watchlist")
-async def get_watchlist():
+async def get_watchlist(_user: _Viewer):
     """Get the current watchlist."""
     return {
         "entries": [
@@ -99,7 +107,7 @@ async def get_watchlist():
 
 
 @router.post("/classify")
-async def override_classification(override: ClassificationOverride):
+async def override_classification(override: ClassificationOverride, _user: _Operator):
     """Manually override an entity's classification."""
     _classification_overrides[override.entity_id] = override
     return {
@@ -111,7 +119,7 @@ async def override_classification(override: ClassificationOverride):
 
 
 @router.get("/classify/{entity_id}")
-async def get_classification(entity_id: str):
+async def get_classification(entity_id: str, _user: _Viewer):
     """Get the current classification for an entity."""
     override = _classification_overrides.get(entity_id)
     if override:
@@ -131,7 +139,7 @@ async def get_classification(entity_id: str):
 
 
 @router.post("/alerts/{alert_id}/acknowledge")
-async def acknowledge_alert(alert_id: str, ack: AlertAcknowledge):
+async def acknowledge_alert(alert_id: str, ack: AlertAcknowledge, _user: _Operator):
     """Acknowledge an alert."""
     for alert in _alert_history:
         if alert.get("alert_id") == alert_id:
@@ -145,6 +153,7 @@ async def acknowledge_alert(alert_id: str, ack: AlertAcknowledge):
 
 @router.get("/alerts")
 async def get_alerts(
+    _user: _Viewer,
     active_only: bool = Query(True, description="Only show unacknowledged alerts"),
 ):
     """Get alerts."""
@@ -162,7 +171,7 @@ async def get_alerts(
 
 
 @router.get("/sitrep")
-async def generate_sitrep():
+async def generate_sitrep(_user: _Viewer):
     """Generate a situation report (SITREP) from the current picture.
 
     Returns a structured summary of the operational picture suitable
@@ -271,7 +280,7 @@ async def generate_sitrep():
 
 
 @router.get("/health")
-async def health_check():
+async def health_check(_user: _Viewer):
     """System health check."""
     return {
         "status": "operational",
@@ -296,6 +305,7 @@ def _get_intel_engine() -> IntelligenceEngine:
 
 @router.get("/sitrep/narrative")
 async def generate_narrative_sitrep(
+    _user: _Operator,
     format: str = Query("nato", description="nato, flash, or brief"),
 ):
     """Generate a narrative SITREP using LLM (or template fallback)."""
@@ -314,7 +324,7 @@ async def generate_narrative_sitrep(
 
 
 @router.post("/query")
-async def natural_language_query(body: dict):
+async def natural_language_query(body: dict, _user: _Operator):
     """Natural language query against the operational picture."""
     query = body.get("query", "")
     if not query:
@@ -346,6 +356,100 @@ async def natural_language_query(body: dict):
         result = {"answer": "Track manager not available", "count": 0}
 
     return result
+
+
+# -- Mission tasking ---------------------------------------------------------
+
+
+class WaypointInput(BaseModel):
+    latitude: float
+    longitude: float
+    altitude_m: float = 50.0
+    speed_mps: float | None = None
+    loiter_seconds: float = 0.0
+
+
+class TaskRequest(BaseModel):
+    drone_id: str                        # e.g. "DRONE-ALPHA"
+    task_type: str = "goto"              # goto | patrol | survey | loiter
+    waypoints: list[WaypointInput]
+    priority: int = 5
+    max_altitude_m: float = 120.0
+    max_speed_mps: float = 30.0
+    notes: str = ""
+    submitted_by: str = "cop-dashboard"
+
+
+# In-memory task store (replaced by DB later)
+_task_plans: list[dict] = []
+
+
+@router.post("/task")
+async def submit_task(req: TaskRequest, _user: _Operator):
+    """Submit a mission task plan for a drone asset.
+
+    Accepts a list of waypoints and drone target ID.
+    Returns plan_id which can be used to track status.
+    """
+    if not req.waypoints:
+        raise HTTPException(status_code=400, detail="At least one waypoint required")
+
+    plan_id = f"PLAN-{str(uuid4())[:8].upper()}"
+    now = datetime.now(timezone.utc).isoformat()
+
+    plan = {
+        "plan_id": plan_id,
+        "drone_id": req.drone_id,
+        "task_type": req.task_type,
+        "status": "planned",
+        "priority": req.priority,
+        "waypoints": [w.model_dump() for w in req.waypoints],
+        "max_altitude_m": req.max_altitude_m,
+        "max_speed_mps": req.max_speed_mps,
+        "notes": req.notes,
+        "submitted_by": req.submitted_by,
+        "created_at": now,
+        "updated_at": now,
+    }
+    _task_plans.append(plan)
+
+    return {
+        "status": "accepted",
+        "plan_id": plan_id,
+        "drone_id": req.drone_id,
+        "waypoint_count": len(req.waypoints),
+        "task_type": req.task_type,
+        "created_at": now,
+    }
+
+
+@router.get("/tasks")
+async def list_tasks(_user: _Viewer, drone_id: str | None = Query(None)):
+    """List submitted task plans, optionally filtered by drone_id."""
+    plans = _task_plans
+    if drone_id:
+        plans = [p for p in plans if p["drone_id"] == drone_id]
+    return {"tasks": plans, "total": len(plans)}
+
+
+@router.get("/tasks/{plan_id}")
+async def get_task(plan_id: str, _user: _Viewer):
+    """Get a specific task plan by ID."""
+    for p in _task_plans:
+        if p["plan_id"] == plan_id:
+            return p
+    raise HTTPException(status_code=404, detail=f"Plan not found: {plan_id}")
+
+
+@router.delete("/tasks/{plan_id}")
+async def cancel_task(plan_id: str, _user: _Operator):
+    """Cancel a task plan."""
+    for p in _task_plans:
+        if p["plan_id"] == plan_id:
+            p["status"] = "cancelled"
+            p["updated_at"] = datetime.now(timezone.utc).isoformat()
+            return {"status": "cancelled", "plan_id": plan_id}
+    raise HTTPException(status_code=404, detail=f"Plan not found: {plan_id}")
 
 
 # -- Helper to register alerts from the engine -------------------------------

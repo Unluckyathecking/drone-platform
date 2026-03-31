@@ -5,449 +5,1175 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MPE // COMMAND</title>
 <link href="https://unpkg.com/maplibre-gl@4.1.0/dist/maplibre-gl.css" rel="stylesheet">
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
 :root {
-  --friendly: #4FC3F7;
-  --neutral: #66BB6A;
-  --hostile: #EF5350;
-  --suspect: #FFA726;
-  --unknown: #9E9E9E;
-  --bg: #0a0e17;
-  --panel: #111827;
-  --panel-border: #1e293b;
-  --text: #e2e8f0;
-  --text-dim: #64748b;
-  --text-muted: #475569;
-  --accent: #4FC3F7;
-  --danger: #EF5350;
-  --warning: #FFA726;
-  --success: #66BB6A;
-  --glow-accent: rgba(79, 195, 247, 0.15);
-  --glow-danger: rgba(239, 83, 80, 0.25);
+  --friendly:    #4FC3F7;
+  --neutral:     #66BB6A;
+  --hostile:     #EF5350;
+  --suspect:     #FFA726;
+  --unknown:     #78909C;
+  --bg:          #080c14;
+  --panel:       #0d1321;
+  --panel2:      #111827;
+  --border:      #1e293b;
+  --border2:     #263248;
+  --text:        #d4dbe8;
+  --text-dim:    #4d6080;
+  --text-mid:    #8fa3be;
+  --accent:      #4FC3F7;
+  --danger:      #EF5350;
+  --warning:     #FFA726;
+  --success:     #4CAF50;
+  --purple:      #9C27B0;
+  --drone-col:   #7c4dff;
+  --glow-acc:    rgba(79,195,247,0.18);
+  --glow-red:    rgba(239,83,80,0.25);
+  --glow-drn:    rgba(124,77,255,0.25);
 }
 
-html, body {
-  height: 100%; overflow: hidden; background: var(--bg); color: var(--text);
-  font-family: 'JetBrains Mono', monospace; font-size: 12px;
-  font-variant-numeric: tabular-nums;
+html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(--text);
+  font-family: 'JetBrains Mono', 'Courier New', monospace; font-size: 11px;
+  font-variant-numeric: tabular-nums; }
+
+/* ═══════════ SCANLINE OVERLAY ═══════════ */
+body::after {
+  content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 9999;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px,
+    rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px);
 }
 
-/* ═══════════════ TOP BAR ═══════════════ */
+/* ═══════════ TOP BAR ═══════════ */
 #topbar {
-  position: fixed; top: 0; left: 0; right: 0; height: 44px; z-index: 1000;
-  background: var(--panel); border-bottom: 1px solid var(--panel-border);
-  display: flex; align-items: center; justify-content: space-between; padding: 0 16px;
+  position: fixed; top: 0; left: 0; right: 0; height: 42px; z-index: 1000;
+  background: var(--panel); border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; padding: 0 12px; gap: 0;
 }
 #topbar::after {
   content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 1px;
-  background: linear-gradient(90deg, transparent, var(--accent), transparent); opacity: 0.4;
+  background: linear-gradient(90deg, transparent 0%, var(--accent) 30%, var(--accent) 70%, transparent 100%);
+  opacity: 0.25;
 }
-.topbar-left { display: flex; align-items: center; gap: 12px; }
-.topbar-brand { font-size: 13px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; white-space: nowrap; }
-.topbar-brand span { color: var(--accent); }
-.topbar-context { font-size: 10px; color: var(--text-dim); letter-spacing: 1.5px; text-transform: uppercase; }
 
-.topbar-center { display: flex; align-items: center; gap: 0; }
-.topbar-sep { width: 1px; height: 24px; background: var(--panel-border); margin: 0 12px; }
-
-.stat-badge {
-  display: flex; align-items: center; gap: 6px;
-  padding: 4px 10px; border: 1px solid var(--panel-border); background: rgba(17,24,39,0.8);
-  cursor: default; transition: all 0.15s;
+.tb-brand {
+  font-size: 14px; font-weight: 700; letter-spacing: 3px;
+  color: var(--text); white-space: nowrap; padding-right: 14px;
+  border-right: 1px solid var(--border);
 }
-.stat-badge .stat-icon { font-size: 14px; }
-.stat-badge .stat-val { font-size: 16px; font-weight: 700; line-height: 1; }
-.stat-badge.air .stat-val { color: var(--accent); }
-.stat-badge.sea .stat-val { color: var(--neutral); }
-.stat-badge.drone .stat-val { color: #7c4dff; }
-.stat-badge.threat .stat-val { color: var(--danger); }
+.tb-brand em { color: var(--accent); font-style: normal; }
 
-.layer-toggles { display: flex; align-items: center; gap: 4px; }
-.layer-btn {
-  padding: 4px 10px; border: 1px solid var(--panel-border); background: transparent;
-  color: var(--text-muted); font-family: inherit; font-size: 10px; font-weight: 600;
-  letter-spacing: 1px; text-transform: uppercase; cursor: pointer; transition: all 0.15s;
-  user-select: none;
+.tb-ctx {
+  font-size: 10px; color: var(--text-dim); letter-spacing: 1.5px;
+  padding: 0 14px; text-transform: uppercase; min-width: 120px;
 }
-.layer-btn:hover { border-color: var(--text-dim); color: var(--text-dim); }
-.layer-btn.on { background: rgba(79,195,247,0.12); border-color: var(--accent); color: var(--accent); }
 
-.topbar-right { display: flex; align-items: center; gap: 12px; }
-.utc-clock { font-size: 13px; font-weight: 600; letter-spacing: 2px; }
-.live-dot {
-  width: 8px; height: 8px; border-radius: 50%; background: var(--success);
-  animation: pulse-live 2s ease-in-out infinite;
+.tb-counters {
+  display: flex; align-items: center; gap: 2px;
+  padding: 0 12px; border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
 }
-.live-label { font-size: 10px; font-weight: 700; letter-spacing: 2px; color: var(--success); }
-@keyframes pulse-live { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+.ctr-badge {
+  display: flex; align-items: center; gap: 5px;
+  padding: 3px 9px; border: 1px solid transparent; cursor: default;
+  transition: border-color .15s;
+}
+.ctr-badge:hover { border-color: var(--border2); }
+.ctr-badge .ctr-lbl { font-size: 9px; letter-spacing: 1.5px; color: var(--text-dim); }
+.ctr-badge .ctr-val { font-size: 15px; font-weight: 700; line-height: 1; }
+.ctr-badge.air  .ctr-val { color: var(--accent); }
+.ctr-badge.sea  .ctr-val { color: var(--neutral); }
+.ctr-badge.drn  .ctr-val { color: var(--drone-col); }
+.ctr-badge.thr  .ctr-val { color: var(--danger); }
 
-/* ═══════════════ LAYOUT GRID ═══════════════ */
+.tb-layers {
+  display: flex; align-items: center; gap: 3px;
+  padding: 0 12px; border-right: 1px solid var(--border);
+}
+.ly-btn {
+  padding: 3px 9px; border: 1px solid var(--border); background: transparent;
+  color: var(--text-dim); font-family: inherit; font-size: 9px; font-weight: 700;
+  letter-spacing: 1.5px; text-transform: uppercase; cursor: pointer;
+  transition: all .12s; user-select: none;
+}
+.ly-btn:hover { border-color: var(--text-mid); color: var(--text-mid); }
+.ly-btn.on { background: rgba(79,195,247,.1); border-color: var(--accent); color: var(--accent); }
+.ly-btn.on.sea  { background: rgba(102,187,106,.08); border-color: var(--neutral); color: var(--neutral); }
+.ly-btn.on.drn  { background: rgba(124,77,255,.1); border-color: var(--drone-col); color: var(--drone-col); }
+.ly-btn.on.thr  { background: rgba(239,83,80,.08); border-color: var(--danger); color: var(--danger); }
+.ly-btn.on.geo  { background: rgba(255,167,38,.08); border-color: var(--warning); color: var(--warning); }
+.ly-btn.on.trl  { background: rgba(79,195,247,.08); border-color: var(--accent); color: var(--accent); }
+
+.tb-right {
+  margin-left: auto; display: flex; align-items: center; gap: 12px;
+}
+.utc-clock { font-size: 13px; font-weight: 600; letter-spacing: 2px; color: var(--text); }
+
+.ws-indicator { display: flex; align-items: center; gap: 5px; }
+.ws-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-dim); }
+.ws-dot.live { background: var(--success); box-shadow: 0 0 6px var(--success);
+  animation: blink 2.2s ease-in-out infinite; }
+.ws-dot.err { background: var(--danger); box-shadow: 0 0 6px var(--danger); }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.4} }
+.ws-label { font-size: 9px; font-weight: 700; letter-spacing: 2px; color: var(--text-dim); }
+.ws-label.live { color: var(--success); }
+.ws-label.err { color: var(--danger); }
+
+/* ═══════════ MAIN GRID ═══════════ */
 #app {
-  position: fixed; top: 44px; left: 0; right: 0; bottom: 0;
+  position: fixed; top: 42px; left: 0; right: 0; bottom: 0;
   display: grid;
-  grid-template-columns: 220px 1fr 0px;
-  grid-template-rows: 1fr auto;
+  grid-template-columns: 200px 1fr 0px;
+  grid-template-rows: 1fr 130px;
+  transition: grid-template-columns .2s ease;
 }
-#app.detail-open { grid-template-columns: 220px 1fr 300px; }
+#app.detail-open { grid-template-columns: 200px 1fr 310px; }
 
-/* ═══════════════ LEFT SIDEBAR ═══════════════ */
-#sidebar-left {
-  grid-row: 1; grid-column: 1;
-  background: var(--panel); border-right: 1px solid var(--panel-border);
-  display: flex; flex-direction: column; overflow: hidden; z-index: 10;
+/* ═══════════ LEFT SIDEBAR ═══════════ */
+#sidebar-l {
+  grid-row: 1 / 3; grid-column: 1;
+  background: var(--panel); border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; overflow: hidden;
 }
-.sidebar-header {
-  padding: 10px 14px; border-bottom: 1px solid var(--panel-border);
-  font-size: 10px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;
-  color: var(--text-dim);
+.sl-section { padding: 7px 12px; border-bottom: 1px solid var(--border); }
+.sl-title {
+  font-size: 9px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;
+  color: var(--text-dim); margin-bottom: 5px;
 }
-.focus-list {
-  flex: 1; overflow-y: auto; padding: 4px 0;
-}
-.focus-list::-webkit-scrollbar { width: 4px; }
-.focus-list::-webkit-scrollbar-thumb { background: var(--panel-border); }
 
+.focus-list { display: flex; flex-direction: column; gap: 1px; }
 .focus-item {
-  display: flex; align-items: center; gap: 10px;
-  padding: 8px 14px; cursor: pointer; transition: background 0.1s;
-  border-left: 2px solid transparent;
-}
-.focus-item:hover { background: rgba(79,195,247,0.06); }
-.focus-item.active { background: rgba(79,195,247,0.1); border-left-color: var(--accent); }
-.focus-item .fi-flag { font-size: 16px; }
-.focus-item .fi-label { font-size: 11px; font-weight: 500; }
-.focus-item .fi-count { margin-left: auto; font-size: 10px; color: var(--text-dim); font-weight: 600; }
-
-.sidebar-divider { height: 1px; background: var(--panel-border); margin: 6px 14px; }
-
-.filter-section { padding: 8px 14px; }
-.filter-section label { font-size: 10px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; color: var(--text-dim); margin-bottom: 6px; display: block; }
-.filter-input {
-  width: 100%; padding: 6px 10px; background: var(--bg); border: 1px solid var(--panel-border);
-  color: var(--text); font-family: inherit; font-size: 11px; outline: none;
-  border-radius: 2px; transition: border-color 0.15s;
-}
-.filter-input:focus { border-color: var(--accent); box-shadow: 0 0 0 1px var(--glow-accent); }
-.filter-input::placeholder { color: var(--text-muted); }
-
-.country-list { flex: 1; overflow-y: auto; padding: 0; }
-.country-item {
   display: flex; align-items: center; gap: 8px;
-  padding: 5px 14px; cursor: pointer; font-size: 11px; color: var(--text-dim);
-  transition: all 0.1s;
+  padding: 5px 12px; cursor: pointer; border-left: 2px solid transparent;
+  transition: background .1s, border-color .1s; white-space: nowrap; overflow: hidden;
 }
-.country-item:hover { color: var(--text); background: rgba(255,255,255,0.03); }
+.focus-item:hover { background: rgba(79,195,247,.06); }
+.focus-item.active { background: rgba(79,195,247,.1); border-left-color: var(--accent); }
+.focus-item .fi-flag { font-size: 14px; flex-shrink: 0; }
+.focus-item .fi-label { font-size: 10px; font-weight: 500; flex: 1; overflow: hidden;
+  text-overflow: ellipsis; }
+.focus-item .fi-cnt { font-size: 9px; color: var(--text-dim); flex-shrink: 0; }
 
-/* ═══════════════ MAP CONTAINER ═══════════════ */
-#map-container {
-  grid-row: 1; grid-column: 2; position: relative;
+.filter-input {
+  width: 100%; padding: 4px 8px; background: var(--bg); border: 1px solid var(--border);
+  color: var(--text); font-family: inherit; font-size: 10px; outline: none;
+  transition: border-color .15s;
 }
+.filter-input:focus { border-color: var(--accent); }
+.filter-input::placeholder { color: var(--text-dim); }
+
+.country-scroll { flex: 1; overflow-y: auto; }
+.country-scroll::-webkit-scrollbar { width: 3px; }
+.country-scroll::-webkit-scrollbar-thumb { background: var(--border2); }
+.country-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 4px 12px; cursor: pointer; font-size: 10px; color: var(--text-dim);
+  transition: all .1s; border-left: 2px solid transparent;
+}
+.country-item:hover { color: var(--text); background: rgba(255,255,255,.02); }
+.country-item.active { color: var(--accent); border-left-color: var(--accent); }
+
+/* alert mini-list in left sidebar */
+.alert-mini { flex-shrink: 0; }
+.alert-mini-item {
+  display: flex; align-items: flex-start; gap: 6px;
+  padding: 4px 12px; border-bottom: 1px solid rgba(30,41,59,.4);
+  cursor: pointer; transition: background .1s;
+}
+.alert-mini-item:hover { background: rgba(239,83,80,.05); }
+.alert-mini-item .al-sev {
+  font-size: 8px; font-weight: 700; letter-spacing: 1px; padding: 1px 5px;
+  flex-shrink: 0; margin-top: 1px;
+}
+.al-sev.crit { background: rgba(239,83,80,.2); color: var(--danger); border: 1px solid rgba(239,83,80,.4); }
+.al-sev.high { background: rgba(255,167,38,.15); color: var(--warning); border: 1px solid rgba(255,167,38,.3); }
+.al-sev.med  { background: rgba(253,216,53,.1); color: #fdd835; border: 1px solid rgba(253,216,53,.3); }
+.alert-mini-item .al-body { flex: 1; min-width: 0; }
+.al-id   { font-size: 10px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.al-reason { font-size: 9px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ═══════════ MAP ═══════════ */
+#map-wrap { grid-row: 1; grid-column: 2; position: relative; overflow: hidden; }
 #map { width: 100%; height: 100%; }
 .maplibregl-ctrl-attrib { display: none !important; }
+.maplibregl-ctrl-group { background: var(--panel2) !important; border: 1px solid var(--border) !important; }
+.maplibregl-ctrl-group button { background: var(--panel2) !important; }
+.maplibregl-ctrl-icon { filter: invert(.7); }
 
-/* map overlays */
-#map-stats {
-  position: absolute; top: 10px; left: 10px; z-index: 5;
+/* map HUD chips */
+#map-hud {
+  position: absolute; top: 8px; left: 8px; z-index: 5;
+  display: flex; gap: 4px; flex-wrap: wrap; pointer-events: none;
+}
+.hud-chip {
+  padding: 2px 7px; background: rgba(13,19,33,.88); border: 1px solid var(--border);
+  font-size: 9px; color: var(--text-dim); backdrop-filter: blur(4px);
+  letter-spacing: .5px;
+}
+.hud-chip b { color: var(--text); font-weight: 600; }
+
+/* crosshair */
+#crosshair {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+  pointer-events: none; z-index: 4; opacity: .2;
+}
+#crosshair::before, #crosshair::after {
+  content: ''; position: absolute; background: var(--accent);
+}
+#crosshair::before { width: 16px; height: 1px; top: 0; left: -8px; }
+#crosshair::after  { width: 1px; height: 16px; top: -8px; left: 0; }
+
+/* ═══════════ RIGHT SIDEBAR (entity detail) ═══════════ */
+#sidebar-r {
+  grid-row: 1 / 3; grid-column: 3;
+  background: var(--panel); border-left: 1px solid var(--border);
+  overflow-y: auto; display: none;
+}
+#app.detail-open #sidebar-r { display: flex; flex-direction: column; }
+
+.dr-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 9px 12px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+  position: sticky; top: 0; background: var(--panel); z-index: 2;
+}
+.dr-header h3 { font-size: 12px; font-weight: 700; letter-spacing: 1px; }
+.dr-close {
+  background: none; border: 1px solid var(--border); color: var(--text-dim);
+  width: 20px; height: 20px; cursor: pointer; font-family: inherit;
+  font-size: 13px; line-height: 1; display: flex; align-items: center;
+  justify-content: center; transition: all .1s;
+}
+.dr-close:hover { border-color: var(--danger); color: var(--danger); }
+
+.dr-body { padding: 10px 12px; flex: 1; }
+.dr-section-title {
+  font-size: 9px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;
+  color: var(--text-dim); margin: 10px 0 5px; padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+.dr-row {
+  display: flex; justify-content: space-between; align-items: baseline;
+  padding: 3px 0; border-bottom: 1px solid rgba(30,41,59,.35);
+}
+.dr-key { font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); }
+.dr-val { font-size: 10px; font-weight: 600; text-align: right; max-width: 180px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.aff-pill {
+  display: inline-block; padding: 1px 7px; font-size: 9px; font-weight: 700;
+  letter-spacing: 1px; text-transform: uppercase;
+}
+.aff-friendly { background: rgba(79,195,247,.15); color: var(--friendly); border: 1px solid rgba(79,195,247,.4); }
+.aff-neutral  { background: rgba(102,187,106,.12); color: var(--neutral);  border: 1px solid rgba(102,187,106,.35); }
+.aff-hostile  { background: rgba(239,83,80,.15);   color: var(--hostile);  border: 1px solid rgba(239,83,80,.4); }
+.aff-suspect  { background: rgba(255,167,38,.12);  color: var(--suspect);  border: 1px solid rgba(255,167,38,.35); }
+.aff-unknown  { background: rgba(120,144,156,.1);  color: var(--unknown);  border: 1px solid rgba(120,144,156,.3); }
+
+.threat-bar-wrap { margin: 4px 0; }
+.threat-bar-bg { width: 100%; height: 4px; background: var(--border2); }
+.threat-bar-fill { height: 4px; transition: width .3s; }
+
+.anomaly-list { margin-top: 3px; }
+.anomaly-item {
+  padding: 3px 6px; margin-bottom: 2px; border-left: 2px solid var(--warning);
+  background: rgba(255,167,38,.06); font-size: 9px; color: var(--text-mid);
+}
+.anomaly-item.crit-anom { border-left-color: var(--danger); background: rgba(239,83,80,.06); }
+
+.dr-actions { padding: 10px 12px; flex-shrink: 0; border-top: 1px solid var(--border); }
+.dr-btn {
+  width: 100%; padding: 5px 10px; margin-bottom: 4px;
+  border: 1px solid var(--border); background: transparent;
+  color: var(--text-mid); font-family: inherit; font-size: 9px; font-weight: 700;
+  letter-spacing: 1.5px; text-transform: uppercase; cursor: pointer; transition: all .12s;
+  text-align: left;
+}
+.dr-btn:hover { border-color: var(--accent); color: var(--accent); background: rgba(79,195,247,.06); }
+.dr-btn.hostile-btn:hover { border-color: var(--danger); color: var(--danger); background: rgba(239,83,80,.06); }
+
+/* track trail canvas */
+#trail-canvas {
+  position: absolute; inset: 0; pointer-events: none; z-index: 3;
+}
+
+/* ═══════════ BOTTOM PANEL (threat board) ═══════════ */
+#bottom-panel {
+  grid-row: 2; grid-column: 1 / 3;
+  background: var(--panel); border-top: 1px solid var(--border);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+#app.detail-open #bottom-panel { grid-column: 1 / 3; }
+
+.bp-header {
+  display: flex; align-items: center; gap: 10px;
+  padding: 6px 14px; border-bottom: 1px solid var(--border);
+  cursor: pointer; user-select: none; flex-shrink: 0;
+}
+.bp-header:hover { background: rgba(255,255,255,.02); }
+.bp-icon { color: var(--danger); font-size: 12px; }
+.bp-title { font-size: 9px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--danger); }
+.bp-cnt {
+  font-size: 10px; font-weight: 700;
+  padding: 1px 7px; background: rgba(239,83,80,.14); border: 1px solid rgba(239,83,80,.3);
+  color: var(--text);
+}
+.bp-tabs { display: flex; gap: 0; margin-left: auto; }
+.bp-tab {
+  padding: 2px 10px; border: 1px solid var(--border); background: transparent;
+  color: var(--text-dim); font-family: inherit; font-size: 9px; font-weight: 700;
+  letter-spacing: 1px; text-transform: uppercase; cursor: pointer; transition: all .12s;
+}
+.bp-tab:first-child { border-right: 0; }
+.bp-tab.on { background: rgba(79,195,247,.08); border-color: var(--accent); color: var(--accent); }
+.bp-expand { font-size: 9px; color: var(--text-dim); letter-spacing: 1px; padding-left: 10px; }
+
+.bp-table-wrap { flex: 1; overflow: auto; }
+.bp-table-wrap::-webkit-scrollbar { height: 3px; width: 3px; }
+.bp-table-wrap::-webkit-scrollbar-thumb { background: var(--border2); }
+.bp-table { width: 100%; border-collapse: collapse; font-size: 10px; }
+.bp-table th {
+  position: sticky; top: 0; background: var(--panel);
+  text-align: left; padding: 3px 10px; font-size: 8px; font-weight: 700;
+  letter-spacing: 1.5px; text-transform: uppercase; color: var(--text-dim);
+  border-bottom: 1px solid var(--border); white-space: nowrap;
+}
+.bp-table td { padding: 3px 10px; border-bottom: 1px solid rgba(30,41,59,.25); white-space: nowrap; }
+.bp-table tr { cursor: pointer; }
+.bp-table tr:hover td { background: rgba(239,83,80,.04); }
+.bp-table tr.selected td { background: rgba(79,195,247,.07); }
+
+.sev-crit { color: var(--danger); font-weight: 700; }
+.sev-high { color: var(--warning); font-weight: 700; }
+.sev-med  { color: #fdd835; font-weight: 600; }
+.sev-low  { color: var(--text-dim); }
+
+.heading-arrow { display: inline-block; font-size: 11px; }
+
+/* ═══════════ GEOFENCE POPUP ═══════════ */
+.geo-popup {
+  background: var(--panel2); border: 1px solid var(--border);
+  padding: 6px 10px; font-size: 9px; color: var(--text-mid);
+  pointer-events: none;
+}
+.geo-popup strong { color: var(--warning); font-size: 10px; display: block; margin-bottom: 2px; }
+
+/* ═══════════ MILSYMBOL ICON ═══════════ */
+.milsym-marker { cursor: pointer; }
+
+/* ═══════════ LOADING OVERLAY ═══════════ */
+#loading {
+  position: fixed; inset: 0; background: var(--bg); z-index: 9000;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 14px; transition: opacity .4s;
+}
+#loading.fade { opacity: 0; pointer-events: none; }
+.loading-brand { font-size: 22px; font-weight: 700; letter-spacing: 5px; color: var(--accent); }
+.loading-sub { font-size: 10px; color: var(--text-dim); letter-spacing: 2px; }
+.loading-bar { width: 200px; height: 2px; background: var(--border2); overflow: hidden; }
+.loading-fill { height: 100%; width: 0; background: var(--accent); animation: load-fill 1.8s ease forwards; }
+@keyframes load-fill { to { width: 100%; } }
+
+/* ═══════════ TOOLBAR ACTION BUTTONS ═══════════ */
+.tb-action-btn {
+  padding: 3px 10px; border: 1px solid var(--border); background: transparent;
+  color: var(--text-dim); font-family: inherit; font-size: 9px; font-weight: 700;
+  letter-spacing: 1.5px; text-transform: uppercase; cursor: pointer;
+  transition: all .12s; white-space: nowrap;
+}
+.tb-action-btn:hover { border-color: var(--accent); color: var(--accent); background: rgba(79,195,247,.06); }
+.tb-action-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(79,195,247,.12); }
+
+/* ═══════════ MODAL OVERLAY ═══════════ */
+.modal-overlay {
+  position: fixed; inset: 0; z-index: 2000; pointer-events: none;
+  display: flex; align-items: flex-start; justify-content: flex-end;
+  padding-top: 50px; padding-right: 8px;
+}
+.modal-overlay.active { pointer-events: all; }
+
+.modal-panel {
+  width: 420px; max-height: calc(100vh - 60px);
+  background: var(--panel); border: 1px solid var(--border);
+  display: flex; flex-direction: column; overflow: hidden;
+  transform: translateX(440px); transition: transform .2s ease;
+  box-shadow: -4px 0 32px rgba(0,0,0,.5);
+}
+.modal-panel.open { transform: translateX(0); }
+.modal-panel.wide { width: 560px; transform: translateX(580px); }
+.modal-panel.wide.open { transform: translateX(0); }
+
+.mp-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 9px 14px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+.mp-title { font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; }
+.mp-close {
+  background: none; border: 1px solid var(--border); color: var(--text-dim);
+  width: 20px; height: 20px; font-family: inherit; font-size: 13px;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: all .1s;
+}
+.mp-close:hover { border-color: var(--danger); color: var(--danger); }
+
+.mp-body { flex: 1; overflow-y: auto; padding: 12px 14px; }
+.mp-body::-webkit-scrollbar { width: 3px; }
+.mp-body::-webkit-scrollbar-thumb { background: var(--border2); }
+
+.mp-footer {
+  padding: 8px 14px; border-top: 1px solid var(--border); flex-shrink: 0;
   display: flex; gap: 6px;
 }
-.map-chip {
-  padding: 3px 8px; background: rgba(17,24,39,0.85); border: 1px solid var(--panel-border);
-  font-size: 10px; color: var(--text-dim); backdrop-filter: blur(4px);
-}
-.map-chip b { color: var(--text); font-weight: 600; }
 
-/* ═══════════════ RIGHT SIDEBAR (detail panel) ═══════════════ */
-#sidebar-right {
-  grid-row: 1; grid-column: 3;
-  background: var(--panel); border-left: 1px solid var(--panel-border);
-  overflow-y: auto; overflow-x: hidden; display: none;
+/* ═══════════ FORM ELEMENTS ═══════════ */
+.form-group { margin-bottom: 10px; }
+.form-label {
+  display: block; font-size: 9px; font-weight: 700; letter-spacing: 1.5px;
+  text-transform: uppercase; color: var(--text-dim); margin-bottom: 4px;
 }
-#app.detail-open #sidebar-right { display: block; }
+.form-select, .form-input, .form-textarea {
+  width: 100%; padding: 5px 8px; background: var(--bg); border: 1px solid var(--border);
+  color: var(--text); font-family: inherit; font-size: 10px; outline: none;
+  transition: border-color .15s;
+}
+.form-select:focus, .form-input:focus, .form-textarea:focus { border-color: var(--accent); }
+.form-select option { background: var(--panel2); }
+.form-textarea { resize: vertical; min-height: 60px; }
 
-.detail-header {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 10px 14px; border-bottom: 1px solid var(--panel-border);
-}
-.detail-header h3 { font-size: 12px; font-weight: 700; letter-spacing: 1px; }
-.detail-close {
-  background: none; border: none; color: var(--text-dim); font-size: 16px;
-  cursor: pointer; font-family: inherit; line-height: 1;
-}
-.detail-close:hover { color: var(--text); }
+.form-row { display: flex; gap: 6px; }
+.form-row .form-group { flex: 1; }
 
-.detail-body { padding: 12px 14px; }
-.detail-row {
-  display: flex; justify-content: space-between; padding: 5px 0;
-  border-bottom: 1px solid rgba(30,41,59,0.5);
+.btn-primary {
+  padding: 5px 14px; border: 1px solid var(--accent); background: rgba(79,195,247,.1);
+  color: var(--accent); font-family: inherit; font-size: 9px; font-weight: 700;
+  letter-spacing: 1.5px; text-transform: uppercase; cursor: pointer; transition: all .12s;
 }
-.detail-key { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); }
-.detail-val { font-size: 11px; font-weight: 600; text-align: right; }
+.btn-primary:hover { background: rgba(79,195,247,.2); }
+.btn-primary:disabled { opacity: .4; cursor: not-allowed; }
 
-.detail-section-title {
-  font-size: 10px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;
-  color: var(--text-dim); margin: 14px 0 6px; padding-top: 8px;
-  border-top: 1px solid var(--panel-border);
+.btn-danger {
+  padding: 5px 14px; border: 1px solid var(--danger); background: rgba(239,83,80,.1);
+  color: var(--danger); font-family: inherit; font-size: 9px; font-weight: 700;
+  letter-spacing: 1.5px; text-transform: uppercase; cursor: pointer; transition: all .12s;
 }
+.btn-danger:hover { background: rgba(239,83,80,.2); }
 
-/* affiliation colors in detail */
-.aff-friendly { color: var(--friendly); }
-.aff-neutral { color: var(--neutral); }
-.aff-hostile { color: var(--hostile); }
-.aff-suspect { color: var(--suspect); }
-.aff-unknown { color: var(--unknown); }
+.btn-ghost {
+  padding: 5px 14px; border: 1px solid var(--border); background: transparent;
+  color: var(--text-dim); font-family: inherit; font-size: 9px; font-weight: 700;
+  letter-spacing: 1.5px; text-transform: uppercase; cursor: pointer; transition: all .12s;
+}
+.btn-ghost:hover { border-color: var(--text-mid); color: var(--text-mid); }
 
-/* ═══════════════ THREAT BOARD ═══════════════ */
-#threat-board {
-  grid-column: 1 / -1; grid-row: 2;
-  background: var(--panel); border-top: 1px solid var(--panel-border);
-  overflow: hidden; transition: height 0.2s ease;
-  height: 36px;
+/* ═══════════ MISSION TASKING ═══════════ */
+.waypoint-list { margin: 6px 0; }
+.waypoint-item {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 8px; border: 1px solid var(--border); margin-bottom: 3px;
+  background: rgba(255,255,255,.02);
 }
-#threat-board.expanded { height: 160px; }
+.wp-num { font-size: 9px; color: var(--text-dim); width: 16px; flex-shrink: 0; font-weight: 700; }
+.wp-coords { font-size: 10px; flex: 1; }
+.wp-alt { font-size: 9px; color: var(--text-dim); }
+.wp-del {
+  background: none; border: none; color: var(--text-dim); cursor: pointer;
+  font-size: 12px; line-height: 1; padding: 0 2px; transition: color .1s;
+}
+.wp-del:hover { color: var(--danger); }
 
-.threat-header {
-  display: flex; align-items: center; gap: 12px;
-  padding: 8px 16px; cursor: pointer; user-select: none;
-  height: 36px;
+.draw-hint {
+  padding: 6px 10px; border: 1px dashed var(--border2); background: rgba(79,195,247,.04);
+  font-size: 9px; color: var(--text-dim); letter-spacing: .5px; margin-bottom: 8px;
 }
-.threat-header:hover { background: rgba(239,83,80,0.04); }
-.threat-icon { color: var(--danger); font-size: 13px; }
-.threat-title { font-size: 10px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--danger); }
-.threat-count {
-  font-size: 11px; font-weight: 700; color: var(--text);
-  padding: 1px 8px; background: rgba(239,83,80,0.15); border: 1px solid rgba(239,83,80,0.3);
-}
-.threat-expand { margin-left: auto; font-size: 10px; color: var(--text-dim); letter-spacing: 1px; text-transform: uppercase; }
+.draw-hint.active { border-color: var(--accent); color: var(--accent); background: rgba(79,195,247,.08); }
 
-.threat-table {
-  width: 100%; overflow-x: auto; overflow-y: auto;
-  max-height: 124px; padding: 0 16px 8px;
+.task-history-item {
+  padding: 5px 8px; border: 1px solid var(--border); margin-bottom: 3px;
+  display: flex; align-items: center; gap: 8px; font-size: 10px;
 }
-.threat-table table { width: 100%; border-collapse: collapse; font-size: 11px; }
-.threat-table th {
-  text-align: left; padding: 4px 10px; font-size: 9px; font-weight: 700;
-  letter-spacing: 1.5px; text-transform: uppercase; color: var(--text-muted);
-  border-bottom: 1px solid var(--panel-border); position: sticky; top: 0;
-  background: var(--panel);
+.task-status-pill {
+  font-size: 8px; font-weight: 700; letter-spacing: 1px; padding: 1px 6px;
+  border: 1px solid; flex-shrink: 0;
 }
-.threat-table td { padding: 4px 10px; border-bottom: 1px solid rgba(30,41,59,0.3); white-space: nowrap; }
-.threat-table tr:hover td { background: rgba(239,83,80,0.04); }
-.threat-table tr { cursor: pointer; }
+.ts-planned   { color: var(--accent); border-color: var(--accent); background: rgba(79,195,247,.1); }
+.ts-cancelled { color: var(--text-dim); border-color: var(--border2); }
 
-.sev-critical { color: var(--danger); font-weight: 700; }
-.sev-high { color: var(--warning); font-weight: 700; }
-.sev-medium { color: #fdd835; font-weight: 600; }
-.sev-low { color: var(--text-dim); }
-
-/* ═══════════════ RESPONSIVE ═══════════════ */
-@media (max-width: 1200px) {
-  #sidebar-left { width: 56px; min-width: 56px; }
-  #app { grid-template-columns: 56px 1fr 0px; }
-  #app.detail-open { grid-template-columns: 56px 1fr 300px; }
-  .sidebar-header, .filter-section, .country-list, .sidebar-divider { display: none; }
-  .focus-item .fi-label, .focus-item .fi-count { display: none; }
-  .focus-item { justify-content: center; padding: 10px 0; }
+/* ═══════════ SITREP ═══════════ */
+.sitrep-block {
+  font-size: 10px; line-height: 1.7; white-space: pre-wrap;
+  color: var(--text-mid); letter-spacing: .2px;
 }
+.sitrep-section {
+  margin-bottom: 12px;
+}
+.sitrep-heading {
+  font-size: 9px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;
+  color: var(--accent); margin-bottom: 5px; padding-bottom: 3px;
+  border-bottom: 1px solid var(--border);
+}
+.sitrep-kv { display: flex; justify-content: space-between; padding: 2px 0;
+  border-bottom: 1px solid rgba(30,41,59,.3); }
+.sitrep-k { font-size: 9px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
+.sitrep-v { font-size: 10px; font-weight: 600; }
+
+.sitrep-loading {
+  display: flex; align-items: center; gap: 8px; color: var(--text-dim);
+  font-size: 10px; padding: 20px 0;
+}
+.sitrep-spinner {
+  width: 12px; height: 12px; border: 2px solid var(--border2);
+  border-top-color: var(--accent); border-radius: 50%;
+  animation: spin .8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ═══════════ NL QUERY ═══════════ */
+.nl-result {
+  padding: 8px 10px; border: 1px solid var(--border); background: rgba(255,255,255,.02);
+  font-size: 10px; color: var(--text-mid); line-height: 1.6; margin-top: 8px;
+  white-space: pre-wrap;
+}
+.nl-result.error { border-color: rgba(239,83,80,.4); background: rgba(239,83,80,.05);
+  color: var(--danger); }
+.nl-result.success { border-color: rgba(79,195,247,.3); }
+
+.nl-example {
+  display: inline-block; padding: 2px 8px; border: 1px solid var(--border2);
+  font-size: 9px; color: var(--text-dim); cursor: pointer; margin: 2px;
+  transition: all .1s;
+}
+.nl-example:hover { border-color: var(--accent); color: var(--accent); }
+
+.entity-result-item {
+  padding: 5px 8px; border: 1px solid var(--border); margin-bottom: 3px;
+  display: flex; align-items: center; gap: 8px; cursor: pointer;
+  transition: background .1s;
+}
+.entity-result-item:hover { background: rgba(79,195,247,.06); }
+
+/* ═══════════ PLAYBACK ═══════════ */
+.playback-controls {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 12px;
+}
+.pb-btn {
+  padding: 4px 10px; border: 1px solid var(--border); background: transparent;
+  color: var(--text-dim); font-family: inherit; font-size: 10px; cursor: pointer;
+  transition: all .12s;
+}
+.pb-btn:hover { border-color: var(--accent); color: var(--accent); }
+.pb-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(79,195,247,.1); }
+
+.playback-slider-wrap { margin-bottom: 10px; }
+.playback-slider {
+  width: 100%; height: 4px; appearance: none; background: var(--border2);
+  outline: none; cursor: pointer;
+}
+.playback-slider::-webkit-slider-thumb {
+  appearance: none; width: 12px; height: 12px; border-radius: 50%;
+  background: var(--accent); cursor: pointer;
+}
+.pb-time { font-size: 10px; color: var(--text-mid); text-align: center;
+  letter-spacing: 1px; margin-bottom: 8px; }
+
+.pb-track-item {
+  display: flex; align-items: center; gap: 6px; padding: 3px 6px;
+  font-size: 10px; border-bottom: 1px solid rgba(30,41,59,.2);
+}
+.pb-track-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.pb-track-id { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pb-track-pos { font-size: 9px; color: var(--text-dim); }
+
+/* ═══════════ LOGIN SCREEN ═══════════ */
+#login-screen {
+  position: fixed; inset: 0; z-index: 8000;
+  background: var(--bg); display: flex; align-items: center; justify-content: center;
+}
+#login-screen.hidden { display: none; }
+
+.login-box {
+  width: 340px; border: 1px solid var(--border);
+  background: var(--panel); box-shadow: 0 0 60px rgba(0,0,0,.6);
+}
+.login-header {
+  padding: 24px 28px 18px; border-bottom: 1px solid var(--border); text-align: center;
+}
+.login-brand { font-size: 20px; font-weight: 700; letter-spacing: 4px; color: var(--accent); }
+.login-sub { font-size: 9px; color: var(--text-dim); letter-spacing: 2px;
+  text-transform: uppercase; margin-top: 4px; }
+.login-body { padding: 22px 28px; }
+.login-field { margin-bottom: 14px; }
+.login-field label { display: block; font-size: 9px; font-weight: 700; letter-spacing: 2px;
+  text-transform: uppercase; color: var(--text-dim); margin-bottom: 5px; }
+.login-input {
+  width: 100%; padding: 8px 10px; background: var(--bg); border: 1px solid var(--border);
+  color: var(--text); font-family: inherit; font-size: 12px; outline: none;
+  transition: border-color .15s;
+}
+.login-input:focus { border-color: var(--accent); box-shadow: 0 0 0 1px rgba(79,195,247,.2); }
+.login-btn {
+  width: 100%; padding: 9px; border: 1px solid var(--accent);
+  background: rgba(79,195,247,.1); color: var(--accent);
+  font-family: inherit; font-size: 10px; font-weight: 700; letter-spacing: 2px;
+  text-transform: uppercase; cursor: pointer; transition: all .15s; margin-top: 4px;
+}
+.login-btn:hover { background: rgba(79,195,247,.2); }
+.login-btn:disabled { opacity: .5; cursor: not-allowed; }
+.login-error {
+  padding: 6px 10px; background: rgba(239,83,80,.1); border: 1px solid rgba(239,83,80,.4);
+  color: var(--danger); font-size: 10px; margin-bottom: 12px; display: none;
+}
+.login-error.show { display: block; }
+.login-footer {
+  padding: 10px 28px 18px; text-align: center;
+  font-size: 9px; color: var(--text-dim); line-height: 1.6;
+}
+.login-footer code { color: var(--text-mid); background: var(--bg);
+  padding: 1px 5px; border: 1px solid var(--border); }
+
+/* user badge in topbar */
+.user-badge { display: flex; align-items: center; gap: 6px;
+  padding: 2px 8px; border: 1px solid var(--border); cursor: default; }
+.user-role { font-size: 8px; font-weight: 700; letter-spacing: 1px;
+  padding: 1px 5px; border: 1px solid; }
+.role-operator { color: var(--accent); border-color: var(--accent); background: rgba(79,195,247,.1); }
+.role-viewer   { color: var(--text-dim); border-color: var(--border2); }
+.user-name { font-size: 10px; font-weight: 600; }
+.logout-btn {
+  background: none; border: 1px solid var(--border); color: var(--text-dim);
+  font-family: inherit; font-size: 9px; font-weight: 700; letter-spacing: 1px;
+  padding: 2px 7px; cursor: pointer; text-transform: uppercase; transition: all .12s;
+}
+.logout-btn:hover { border-color: var(--danger); color: var(--danger); }
 </style>
 </head>
 <body>
 
-<!-- ═══════════════ TOP BAR ═══════════════ -->
-<div id="topbar">
-  <div class="topbar-left">
-    <div class="topbar-brand"><span>MPE</span> // COMMAND</div>
-    <div class="topbar-context" id="ctx-label"></div>
-  </div>
-  <div class="topbar-center">
-    <div class="stat-badge air">
-      <span class="stat-icon">&#9992;</span>
-      <span class="stat-val" id="count-air">0</span>
+<!-- ═══════════ LOGIN SCREEN ═══════════ -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-header">
+      <div class="login-brand">MPE // C2</div>
+      <div class="login-sub">Common Operating Picture — Secure Access</div>
     </div>
-    <div class="stat-badge sea">
-      <span class="stat-icon">&#9875;</span>
-      <span class="stat-val" id="count-sea">0</span>
+    <div class="login-body">
+      <div class="login-error" id="login-error"></div>
+      <div class="login-field">
+        <label for="login-user">Username</label>
+        <input class="login-input" id="login-user" type="text" autocomplete="username"
+          placeholder="Enter username" onkeydown="loginKeydown(event)">
+      </div>
+      <div class="login-field">
+        <label for="login-pass">Password</label>
+        <input class="login-input" id="login-pass" type="password" autocomplete="current-password"
+          placeholder="Enter password" onkeydown="loginKeydown(event)">
+      </div>
+      <button class="login-btn" id="login-btn" onclick="doLogin()">&#9654; AUTHENTICATE</button>
     </div>
-    <div class="stat-badge drone">
-      <span class="stat-icon">&#9670;</span>
-      <span class="stat-val" id="count-drone">0</span>
-    </div>
-    <div class="stat-badge threat">
-      <span class="stat-icon">&#9888;</span>
-      <span class="stat-val" id="count-threat">0</span>
-    </div>
-    <div class="topbar-sep"></div>
-    <div class="layer-toggles">
-      <button class="layer-btn on" data-layer="air" onclick="toggleLayer(this)">AIR</button>
-      <button class="layer-btn on" data-layer="sea" onclick="toggleLayer(this)">SEA</button>
-      <button class="layer-btn on" data-layer="thr" onclick="toggleLayer(this)">THR</button>
-    </div>
-  </div>
-  <div class="topbar-right">
-    <div class="utc-clock" id="utc-clock">00:00:00Z</div>
-    <div style="display:flex;align-items:center;gap:6px;">
-      <div class="live-dot" id="live-dot"></div>
-      <div class="live-label" id="live-label">LIVE</div>
+    <div class="login-footer">
+      Default credentials:<br>
+      <code>admin</code> / <code>admin123</code> (operator) &nbsp;|&nbsp;
+      <code>viewer</code> / <code>viewer123</code> (read-only)<br>
+      <span style="color:var(--danger);font-weight:700;">Change before deployment.</span>
     </div>
   </div>
 </div>
 
-<!-- ═══════════════ APP GRID ═══════════════ -->
+<!-- ═══════════ LOADING SCREEN ═══════════ -->
+<div id="loading" class="hidden" style="display:none">
+  <div class="loading-brand">MPE // C2</div>
+  <div class="loading-bar"><div class="loading-fill"></div></div>
+  <div class="loading-sub">INITIALISING COMMON OPERATING PICTURE</div>
+</div>
+
+<!-- ═══════════ TOP BAR ═══════════ -->
+<div id="topbar">
+  <div class="tb-brand"><em>MPE</em> // COMMAND</div>
+  <div class="tb-ctx" id="ctx-label">GLOBAL</div>
+  <div class="tb-counters">
+    <div class="ctr-badge air" title="Aircraft">
+      <span class="ctr-lbl">AIR</span>
+      <span class="ctr-val" id="cnt-air">0</span>
+    </div>
+    <div class="ctr-badge sea" title="Vessels">
+      <span class="ctr-lbl">SEA</span>
+      <span class="ctr-val" id="cnt-sea">0</span>
+    </div>
+    <div class="ctr-badge drn" title="Drones">
+      <span class="ctr-lbl">UAV</span>
+      <span class="ctr-val" id="cnt-drn">0</span>
+    </div>
+    <div class="ctr-badge thr" title="Threats">
+      <span class="ctr-lbl">THR</span>
+      <span class="ctr-val" id="cnt-thr">0</span>
+    </div>
+  </div>
+  <div class="tb-layers">
+    <button class="ly-btn on"     data-layer="air" onclick="toggleLayer(this)">AIR</button>
+    <button class="ly-btn on sea" data-layer="sea" onclick="toggleLayer(this)">SEA</button>
+    <button class="ly-btn on drn" data-layer="drn" onclick="toggleLayer(this)">UAV</button>
+    <button class="ly-btn on thr" data-layer="thr" onclick="toggleLayer(this)">THR</button>
+    <button class="ly-btn on geo" data-layer="geo" onclick="toggleLayer(this)">GEO</button>
+    <button class="ly-btn on trl" data-layer="trl" onclick="toggleLayer(this)">TRAIL</button>
+  </div>
+  <div class="tb-right">
+    <button class="tb-action-btn" id="btn-tasking"  onclick="togglePanel('tasking')">&#9670; TASKING</button>
+    <button class="tb-action-btn" id="btn-sitrep"   onclick="togglePanel('sitrep')">&#9636; SITREP</button>
+    <button class="tb-action-btn" id="btn-nlquery"  onclick="togglePanel('nlquery')">&#9654; NL QUERY</button>
+    <button class="tb-action-btn" id="btn-playback" onclick="togglePanel('playback')">&#9664;&#9654; PLAYBACK</button>
+    <div class="utc-clock" id="utc-clock">--:--:--Z</div>
+    <div class="ws-indicator">
+      <div class="ws-dot" id="ws-dot"></div>
+      <div class="ws-label" id="ws-label">INIT</div>
+    </div>
+    <div class="user-badge" id="user-badge" style="display:none">
+      <span class="user-role" id="user-role-badge">--</span>
+      <span class="user-name" id="user-name-badge">--</span>
+    </div>
+    <button class="logout-btn" id="logout-btn" style="display:none" onclick="doLogout()">LOGOUT</button>
+  </div>
+</div>
+
+<!-- ═══════════ APP GRID ═══════════ -->
 <div id="app">
+
   <!-- LEFT SIDEBAR -->
-  <div id="sidebar-left">
-    <div class="sidebar-header">FOCUS</div>
-    <div class="focus-list" id="focus-list">
-      <div class="focus-item active" data-code="GLOBAL" onclick="focusRegion(this)">
-        <span class="fi-flag">&#127760;</span>
-        <span class="fi-label">GLOBAL</span>
-      </div>
+  <div id="sidebar-l">
+    <div class="sl-section">
+      <div class="sl-title">FOCUS REGION</div>
+      <div class="focus-list" id="focus-list"></div>
     </div>
-    <div class="sidebar-divider"></div>
-    <div class="filter-section">
-      <label>FILTER</label>
-      <input class="filter-input" id="country-filter" type="text" placeholder="Search..." oninput="filterCountries(this.value)">
+    <div class="sl-section">
+      <div class="sl-title">COUNTRY FILTER</div>
+      <input class="filter-input" id="country-filter" type="text" placeholder="Search country..." oninput="filterCountries(this.value)">
     </div>
-    <div class="country-list" id="country-list"></div>
+    <div class="country-scroll" id="country-scroll"></div>
+    <div class="sl-section alert-mini" style="flex-shrink:0; border-top: 1px solid var(--border);">
+      <div class="sl-title" style="margin-bottom:4px;">ACTIVE ALERTS <span id="alert-mini-cnt" style="color:var(--danger)">0</span></div>
+      <div id="alert-mini-list" style="max-height:160px;overflow-y:auto;"></div>
+    </div>
   </div>
 
   <!-- MAP -->
-  <div id="map-container">
+  <div id="map-wrap">
     <div id="map"></div>
-    <div id="map-stats">
-      <div class="map-chip">TRACKS: <b id="chip-tracks">0</b></div>
-      <div class="map-chip">RADIUS: <b id="chip-radius">250nm</b></div>
-      <div class="map-chip">REFRESH: <b>5s</b></div>
+    <canvas id="trail-canvas"></canvas>
+    <div id="map-hud">
+      <div class="hud-chip">TRACKS: <b id="hud-tracks">0</b></div>
+      <div class="hud-chip">REGION: <b id="hud-region">GLOBAL</b></div>
+      <div class="hud-chip">REFRESH: <b id="hud-refresh">WS</b></div>
+      <div class="hud-chip">LAT/LON: <b id="hud-coords">--</b></div>
     </div>
+    <div id="crosshair"></div>
   </div>
 
   <!-- RIGHT SIDEBAR (entity detail) -->
-  <div id="sidebar-right">
-    <div class="detail-header">
-      <h3 id="detail-title">ENTITY DETAIL</h3>
-      <button class="detail-close" onclick="closeDetail()">&times;</button>
+  <div id="sidebar-r">
+    <div class="dr-header">
+      <h3 id="dr-title">ENTITY DETAIL</h3>
+      <button class="dr-close" onclick="closeDetail()">&times;</button>
     </div>
-    <div class="detail-body" id="detail-body"></div>
+    <div class="dr-body" id="dr-body"></div>
+    <div class="dr-actions" id="dr-actions"></div>
   </div>
 
-  <!-- THREAT BOARD -->
-  <div id="threat-board">
-    <div class="threat-header" onclick="toggleThreats()">
-      <span class="threat-icon">&#9888;</span>
-      <span class="threat-title">THREAT BOARD</span>
-      <span class="threat-count" id="threat-board-count">0 ACTIVE</span>
-      <span class="threat-expand" id="threat-expand-label">&#9660; EXPAND</span>
+  <!-- BOTTOM PANEL -->
+  <div id="bottom-panel">
+    <div class="bp-header" id="bp-header" onclick="toggleBottomPanel()">
+      <span class="bp-icon">&#9888;</span>
+      <span class="bp-title">THREAT BOARD</span>
+      <span class="bp-cnt" id="bp-cnt">0 ACTIVE</span>
+      <div class="bp-tabs" onclick="event.stopPropagation()">
+        <button class="bp-tab on" data-tab="threats" onclick="switchTab(this)">THREATS</button>
+        <button class="bp-tab" data-tab="all" onclick="switchTab(this)">ALL TRACKS</button>
+      </div>
+      <span class="bp-expand" id="bp-expand">&#9650; COLLAPSE</span>
     </div>
-    <div class="threat-table">
-      <table>
-        <thead>
-          <tr>
-            <th>LVL</th><th>ID</th><th>DOM</th><th>AFF</th><th>SPD</th><th>SEV</th><th>REASON</th><th>POS</th>
-          </tr>
-        </thead>
-        <tbody id="threat-tbody"></tbody>
+    <div class="bp-table-wrap" id="bp-table-wrap">
+      <table class="bp-table">
+        <thead id="bp-thead"></thead>
+        <tbody id="bp-tbody"></tbody>
       </table>
+    </div>
+  </div>
+
+</div><!-- #app -->
+
+<!-- ═══════════ MISSION TASKING PANEL ═══════════ -->
+<div class="modal-overlay" id="overlay-tasking">
+  <div class="modal-panel" id="panel-tasking">
+    <div class="mp-header">
+      <span class="mp-title" style="color:var(--drone-col)">&#9670; MISSION TASKING</span>
+      <button class="mp-close" onclick="togglePanel('tasking')">&times;</button>
+    </div>
+    <div class="mp-body">
+      <div class="form-group">
+        <label class="form-label">Target Asset</label>
+        <select class="form-select" id="task-drone-id">
+          <option value="DRONE-ALPHA">DRONE-ALPHA — English Channel ISR</option>
+          <option value="DRONE-BRAVO">DRONE-BRAVO — Dover Strait</option>
+          <option value="DRONE-CHARLIE">DRONE-CHARLIE — Caribbean</option>
+          <option value="DRONE-DELTA">DRONE-DELTA — Strait of Malacca</option>
+          <option value="DRONE-ECHO">DRONE-ECHO — Baltic / Estonia AOR</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Task Type</label>
+          <select class="form-select" id="task-type">
+            <option value="goto">GOTO — Transit to waypoint</option>
+            <option value="patrol">PATROL — Repeat route</option>
+            <option value="survey">SURVEY — Area coverage</option>
+            <option value="loiter">LOITER — Hold position</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Priority (1-10)</label>
+          <input class="form-input" type="number" id="task-priority" min="1" max="10" value="5">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Max Alt (m)</label>
+          <input class="form-input" type="number" id="task-alt" min="10" max="500" value="120">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Max Speed (m/s)</label>
+          <input class="form-input" type="number" id="task-speed" min="1" max="50" value="20">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Notes</label>
+        <textarea class="form-textarea" id="task-notes" placeholder="Optional mission notes..."></textarea>
+      </div>
+
+      <div class="form-label" style="margin-bottom:5px;">WAYPOINTS</div>
+      <div class="draw-hint" id="draw-hint">Click MAP to drop waypoints — or enter coordinates below</div>
+      <div class="waypoint-list" id="waypoint-list"></div>
+
+      <div class="form-row" style="margin-top:6px;">
+        <div class="form-group">
+          <label class="form-label">Lat</label>
+          <input class="form-input" type="number" id="wp-lat" step="0.0001" placeholder="51.3632">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Lon</label>
+          <input class="form-input" type="number" id="wp-lon" step="0.0001" placeholder="-0.2652">
+        </div>
+        <div class="form-group" style="flex:0.6">
+          <label class="form-label">Alt (m)</label>
+          <input class="form-input" type="number" id="wp-alt-input" value="50">
+        </div>
+      </div>
+      <button class="btn-ghost" style="width:100%;margin-bottom:12px;" onclick="addWaypointManual()">+ ADD WAYPOINT</button>
+
+      <div class="form-label" style="margin-bottom:6px;">DRAW ON MAP</div>
+      <div style="display:flex;gap:6px;margin-bottom:12px;">
+        <button class="btn-ghost" id="btn-draw-toggle" onclick="toggleDrawMode()" style="flex:1">&#9673; START DRAWING</button>
+        <button class="btn-danger" onclick="clearWaypoints()" style="padding:5px 10px">&#10005; CLEAR</button>
+      </div>
+
+      <div class="form-label" style="margin-bottom:5px;">SUBMITTED TASKS</div>
+      <div id="task-history" style="max-height:120px;overflow-y:auto;"></div>
+    </div>
+    <div class="mp-footer">
+      <button class="btn-primary" id="btn-submit-task" onclick="submitTask()" style="flex:1">&#9654; SUBMIT TASK PLAN</button>
+      <button class="btn-ghost" onclick="togglePanel('tasking')">CANCEL</button>
     </div>
   </div>
 </div>
 
+<!-- ═══════════ SITREP PANEL ═══════════ -->
+<div class="modal-overlay" id="overlay-sitrep">
+  <div class="modal-panel" id="panel-sitrep">
+    <div class="mp-header">
+      <span class="mp-title" style="color:var(--accent)">&#9636; SITUATION REPORT</span>
+      <button class="mp-close" onclick="togglePanel('sitrep')">&times;</button>
+    </div>
+    <div class="mp-body" id="sitrep-body">
+      <div class="sitrep-loading">
+        <div class="sitrep-spinner"></div>
+        <span>Loading SITREP...</span>
+      </div>
+    </div>
+    <div class="mp-footer">
+      <select class="form-select" id="sitrep-format" style="flex:1;padding:4px 8px">
+        <option value="nato">NATO Format</option>
+        <option value="flash">Flash Report</option>
+        <option value="brief">Brief</option>
+      </select>
+      <button class="btn-primary" onclick="loadSitrep()">&#8635; REFRESH</button>
+      <button class="btn-ghost" onclick="togglePanel('sitrep')">CLOSE</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ NL QUERY PANEL ═══════════ -->
+<div class="modal-overlay" id="overlay-nlquery">
+  <div class="modal-panel" id="panel-nlquery">
+    <div class="mp-header">
+      <span class="mp-title" style="color:var(--success)">&#9654; NATURAL LANGUAGE QUERY</span>
+      <button class="mp-close" onclick="togglePanel('nlquery')">&times;</button>
+    </div>
+    <div class="mp-body">
+      <div class="form-group">
+        <label class="form-label">Query the operational picture</label>
+        <textarea class="form-textarea" id="nl-input" placeholder="e.g. Show all hostile vessels in the Strait of Hormuz..." style="min-height:70px;" onkeydown="nlKeydown(event)"></textarea>
+      </div>
+      <div style="margin-bottom:8px;">
+        <div class="form-label" style="margin-bottom:4px;">Examples</div>
+        <span class="nl-example" onclick="setNlExample(this)">Show all hostile tracks</span>
+        <span class="nl-example" onclick="setNlExample(this)">Which vessels are in the Taiwan Strait?</span>
+        <span class="nl-example" onclick="setNlExample(this)">List aircraft with threat level above 6</span>
+        <span class="nl-example" onclick="setNlExample(this)">Any emergency squawks active?</span>
+        <span class="nl-example" onclick="setNlExample(this)">How many military vessels are tracked?</span>
+      </div>
+      <div id="nl-result-wrap"></div>
+    </div>
+    <div class="mp-footer">
+      <button class="btn-primary" id="btn-nl-submit" onclick="submitNlQuery()" style="flex:1">&#9654; SUBMIT QUERY</button>
+      <button class="btn-ghost" onclick="clearNlResult()">CLEAR</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ PLAYBACK PANEL ═══════════ -->
+<div class="modal-overlay" id="overlay-playback">
+  <div class="modal-panel" id="panel-playback">
+    <div class="mp-header">
+      <span class="mp-title" style="color:var(--warning)">&#9664;&#9654; TRACK PLAYBACK</span>
+      <button class="mp-close" onclick="togglePanel('playback')">&times;</button>
+    </div>
+    <div class="mp-body">
+      <div class="pb-time" id="pb-time-display">--:--:-- UTC</div>
+      <div class="playback-slider-wrap">
+        <input type="range" class="playback-slider" id="pb-slider"
+          min="0" max="100" value="100" oninput="scrubPlayback(this.value)">
+      </div>
+      <div class="playback-controls">
+        <button class="pb-btn" onclick="pbStepBack()">&lt;&lt;</button>
+        <button class="pb-btn active" id="pb-play-btn" onclick="pbTogglePlay()">&#9646;&#9646; PAUSE</button>
+        <button class="pb-btn" onclick="pbStepForward()">&gt;&gt;</button>
+        <select class="form-select" id="pb-speed" style="padding:3px 6px;font-size:9px;flex:1" onchange="pbSetSpeed(this.value)">
+          <option value="0.25">0.25x</option>
+          <option value="0.5">0.5x</option>
+          <option value="1" selected>1x</option>
+          <option value="2">2x</option>
+          <option value="4">4x</option>
+        </select>
+      </div>
+      <div class="form-label" style="margin-bottom:5px;">
+        TRACK SNAPSHOT
+        <span style="color:var(--text-dim);font-weight:400;margin-left:6px;" id="pb-track-count"></span>
+      </div>
+      <div id="pb-track-list" style="max-height:260px;overflow-y:auto;"></div>
+      <div style="margin-top:10px;padding:6px 8px;border:1px solid var(--border);background:rgba(255,255,255,.02);">
+        <div class="form-label" style="margin-bottom:4px;">NOTE</div>
+        <div style="font-size:9px;color:var(--text-dim);line-height:1.6;">
+          Playback replays positions stored in the in-session track history buffer
+          (last ~2 min, up to 12 positions per entity). For full historical replay,
+          connect to PostgreSQL and use the DB track repository.
+        </div>
+      </div>
+    </div>
+    <div class="mp-footer">
+      <button class="btn-ghost" onclick="pbReset()">&#8635; RESET</button>
+      <button class="btn-ghost" onclick="togglePanel('playback')">CLOSE</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ SCRIPTS ═══════════ -->
 <script src="https://unpkg.com/maplibre-gl@4.1.0/dist/maplibre-gl.js"></script>
+<script src="https://unpkg.com/milsymbol@2.2.1/dist/milsymbol.js"></script>
 <script>
 'use strict';
 
-// ═══════════════ STATE ═══════════════
-const state = {
+// ─────────────────────────────────────────────
+// STATE
+// ─────────────────────────────────────────────
+const S = {
+  layers: { air: true, sea: true, drn: true, thr: true, geo: true, trl: true },
   activeCountry: null,
-  layerToggles: { air: true, sea: true, thr: true },
-  selectedEntity: null,
-  threatExpanded: false,
-  lastData: null,
+  activeTab: 'threats',
+  bottomCollapsed: false,
+  selectedId: null,
+  lastData: null,           // full FeatureCollection
+  trackHistory: {},         // id -> [{lng,lat,ts}]
   countries: [],
-  countryBounds: {}
+  wsConnected: false,
 };
+const TRAIL_MAX = 12;       // positions to keep per track
+const EMPTY_FC = { type: 'FeatureCollection', features: [] };
 
-const emptyGeoJSON = { type: 'FeatureCollection', features: [] };
+// ─────────────────────────────────────────────
+// FOCUS REGIONS
+// ─────────────────────────────────────────────
+const FOCUS_REGIONS = [
+  { code: 'GLOBAL', label: 'Global',      flag: '\u{1F310}' },
+  { code: 'gb',     label: 'UK',          flag: '\u{1F1EC}\u{1F1E7}' },
+  { code: 'fi',     label: 'Finland',     flag: '\u{1F1EB}\u{1F1EE}' },
+  { code: 'ee',     label: 'Estonia',     flag: '\u{1F1EA}\u{1F1EA}' },
+  { code: 'co',     label: 'Colombia',    flag: '\u{1F1E8}\u{1F1F4}' },
+  { code: 'ph',     label: 'Philippines', flag: '\u{1F1F5}\u{1F1ED}' },
+  { code: 'ae',     label: 'UAE',         flag: '\u{1F1E6}\u{1F1EA}' },
+  { code: 'jp',     label: 'Japan',       flag: '\u{1F1EF}\u{1F1F5}' },
+  { code: 'au',     label: 'Australia',   flag: '\u{1F1E6}\u{1F1FA}' },
+];
 
-// ═══════════════ MAP INIT ═══════════════
+// ─────────────────────────────────────────────
+// GEOFENCE ZONES (mirrored from geofence.py presets)
+// ─────────────────────────────────────────────
+const GEOFENCE_ZONES = [
+  {
+    id: 'hormuz', name: 'Strait of Hormuz', type: 'alert',
+    coords: [[56.0,26.5],[56.5,26.0],[57.0,25.5],[57.5,25.0],[57.5,24.5],[57.0,24.0],[56.5,24.0],[56.0,24.5],[55.5,25.0],[55.5,25.5],[56.0,26.5]],
+    color: 'rgba(255,167,38,0.3)', outline: '#FFA726',
+  },
+  {
+    id: 'taiwan_adiz', name: 'Taiwan ADIZ', type: 'alert',
+    coords: [[119.5,22.0],[122.5,22.0],[122.5,26.5],[119.5,26.5],[119.5,22.0]],
+    color: 'rgba(239,83,80,0.2)', outline: '#EF5350',
+  },
+  {
+    id: 'epsom', name: 'Epsom AOR', type: 'keep_in',
+    coords: [[-0.55,51.2],[-0.55,51.5],[0.1,51.5],[0.1,51.2],[-0.55,51.2]],
+    color: 'rgba(79,195,247,0.12)', outline: '#4FC3F7',
+  },
+  {
+    id: 'cartagena', name: 'Cartagena EEZ', type: 'keep_out',
+    coords: [[-75.55,10.3],[-75.55,10.5],[-75.45,10.5],[-75.45,10.3],[-75.55,10.3]],
+    color: 'rgba(124,77,255,0.15)', outline: '#7c4dff',
+  },
+];
+
+// ─────────────────────────────────────────────
+// MAP INIT
+// ─────────────────────────────────────────────
 const map = new maplibregl.Map({
   container: 'map',
   style: {
     version: 8,
     name: 'MPE Dark',
     sources: {
-      'osm-raster': {
+      'basemap': {
         type: 'raster',
         tiles: ['https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png'],
         tileSize: 256,
-        attribution: ''
-      }
+        attribution: '',
+      },
     },
-    layers: [{
-      id: 'background', type: 'background',
-      paint: { 'background-color': '#0a0e17' }
-    }, {
-      id: 'osm-raster', type: 'raster', source: 'osm-raster',
-      paint: { 'raster-opacity': 1.0, 'raster-saturation': -0.3, 'raster-brightness-max': 1.0 }
-    }],
-    glyphs: 'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf'
+    layers: [
+      { id: 'bg', type: 'background', paint: { 'background-color': '#080c14' } },
+      { id: 'basemap', type: 'raster', source: 'basemap',
+        paint: { 'raster-opacity': 1, 'raster-saturation': -0.3, 'raster-brightness-max': 1 } },
+    ],
+    glyphs: 'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf',
   },
   center: [0, 20],
   zoom: 2,
   maxZoom: 18,
-  attributionControl: false
+  attributionControl: false,
 });
 
 map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-right');
+map.addControl(new maplibregl.ScaleControl({ maxWidth: 120, unit: 'nautical' }), 'bottom-left');
 
-map.on('load', function () {
-  // ── GeoJSON source with clustering ──
+// track mouse coords
+map.on('mousemove', e => {
+  const { lat, lng } = e.lngLat;
+  document.getElementById('hud-coords').textContent =
+    `${lat.toFixed(3)},${lng.toFixed(3)}`;
+});
+
+// ─────────────────────────────────────────────
+// MAP LOAD — add sources and layers
+// ─────────────────────────────────────────────
+map.on('load', () => {
+  // ── Geofence polygons ──
+  for (const z of GEOFENCE_ZONES) {
+    map.addSource(`geo-${z.id}`, {
+      type: 'geojson',
+      data: {
+        type: 'Feature',
+        geometry: { type: 'Polygon', coordinates: [z.coords] },
+        properties: { name: z.name, type: z.type },
+      },
+    });
+    map.addLayer({
+      id: `geo-fill-${z.id}`, type: 'fill', source: `geo-${z.id}`,
+      paint: { 'fill-color': z.color, 'fill-opacity': 1 },
+    });
+    map.addLayer({
+      id: `geo-line-${z.id}`, type: 'line', source: `geo-${z.id}`,
+      paint: { 'line-color': z.outline, 'line-width': 1, 'line-dasharray': [4, 3] },
+    });
+  }
+
+  // ── Track source with clustering ──
   map.addSource('tracks', {
     type: 'geojson',
-    data: emptyGeoJSON,
+    data: EMPTY_FC,
     cluster: true,
-    clusterMaxZoom: 8,
-    clusterRadius: 50,
+    clusterMaxZoom: 7,
+    clusterRadius: 45,
     clusterProperties: {
-      sum_air: ['+', ['case', ['==', ['get', 'domain'], 'air'], 1, 0]],
-      sum_sea: ['+', ['case', ['==', ['get', 'domain'], 'sea'], 1, 0]],
-      sum_threat: ['+', ['case', ['>=', ['get', 'threat_level'], 4], 1, 0]]
-    }
+      sum_air:    ['+', ['case', ['==', ['get', 'domain'], 'air'],   1, 0]],
+      sum_sea:    ['+', ['case', ['==', ['get', 'domain'], 'sea'],   1, 0]],
+      sum_drone:  ['+', ['case', ['==', ['get', 'domain'], 'drone'], 1, 0]],
+      sum_threat: ['+', ['case', ['>=', ['coalesce', ['get', 'threat_level'], 0], 4], 1, 0]],
+    },
   });
 
-  // ── Cluster circles ──
+  // ── Cluster fill ──
   map.addLayer({
     id: 'clusters', type: 'circle', source: 'tracks',
     filter: ['has', 'point_count'],
     paint: {
-      'circle-color': [
-        'case',
-        ['>', ['get', 'sum_threat'], 0], 'rgba(239,83,80,0.5)',
-        '#263248'
+      'circle-color': ['case',
+        ['>', ['get', 'sum_threat'], 0], 'rgba(239,83,80,0.45)',
+        'rgba(17,24,39,0.85)',
       ],
-      'circle-radius': ['step', ['get', 'point_count'], 14, 50, 20, 200, 28, 1000, 36],
+      'circle-radius': ['step', ['get', 'point_count'], 13, 50, 19, 200, 26, 1000, 34],
       'circle-stroke-width': 1.5,
-      'circle-stroke-color': 'rgba(79,195,247,0.4)',
-      'circle-opacity': 0.8
-    }
+      'circle-stroke-color': ['case',
+        ['>', ['get', 'sum_threat'], 0], 'rgba(239,83,80,0.7)',
+        'rgba(79,195,247,0.4)',
+      ],
+      'circle-opacity': 0.9,
+    },
   });
 
-  // ── Cluster count ──
+  // ── Cluster count label ──
   map.addLayer({
     id: 'cluster-count', type: 'symbol', source: 'tracks',
     filter: ['has', 'point_count'],
     layout: {
       'text-field': '{point_count_abbreviated}',
       'text-font': ['Open Sans Semibold'],
-      'text-size': 11
+      'text-size': 11,
     },
-    paint: {
-      'text-color': '#e2e8f0'
-    }
+    paint: { 'text-color': '#d4dbe8' },
   });
 
-  // ── Individual entities (unclustered) ──
+  // ── Threat halo rings ──
+  map.addLayer({
+    id: 'threat-rings', type: 'circle', source: 'tracks',
+    filter: ['all', ['!', ['has', 'point_count']],
+      ['>=', ['coalesce', ['get', 'threat_level'], 0], 4]],
+    paint: {
+      'circle-color': 'transparent',
+      'circle-stroke-color': [
+        'interpolate', ['linear'], ['coalesce', ['get', 'threat_level'], 0],
+        4, 'rgba(255,167,38,0.5)',
+        7, 'rgba(239,83,80,0.7)',
+        10, '#EF5350',
+      ],
+      'circle-stroke-width': ['interpolate', ['linear'], ['coalesce', ['get', 'threat_level'], 0], 4, 1.5, 10, 3],
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 2, 9, 8, 16, 14, 22],
+      'circle-opacity': 0.8,
+    },
+  });
+
+  // ── Entity dots ──
   map.addLayer({
     id: 'entities', type: 'circle', source: 'tracks',
     filter: ['!', ['has', 'point_count']],
@@ -455,58 +1181,44 @@ map.on('load', function () {
       'circle-color': [
         'match', ['get', 'affiliation'],
         'friendly', '#4FC3F7',
-        'neutral', '#66BB6A',
-        'hostile', '#EF5350',
-        'suspect', '#FFA726',
-        '#9E9E9E'
+        'neutral',  '#66BB6A',
+        'hostile',  '#EF5350',
+        'suspect',  '#FFA726',
+        '#78909C',
       ],
-      'circle-radius': [
-        'interpolate', ['linear'], ['zoom'],
-        2, ['match', ['get', 'domain'], 'air', 2.5, 'sea', 3, 'drone', 3.5, 2.5],
-        6, ['match', ['get', 'domain'], 'air', 4, 'sea', 5, 'drone', 6, 4],
-        12, ['match', ['get', 'domain'], 'air', 6, 'sea', 7, 'drone', 8, 6]
+      'circle-radius': ['interpolate', ['linear'], ['zoom'],
+        2, ['match', ['get', 'domain'], 'air', 2, 'sea', 2.5, 'drone', 3, 2],
+        6, ['match', ['get', 'domain'], 'air', 3.5, 'sea', 4.5, 'drone', 5.5, 3.5],
+        12, ['match', ['get', 'domain'], 'air', 5, 'sea', 6, 'drone', 7, 5],
       ],
       'circle-stroke-width': [
-        'case',
-        ['==', ['get', 'domain'], 'drone'], 1.5,
-        0.8
+        'case', ['==', ['get', 'domain'], 'drone'], 1.5, 0.8,
       ],
       'circle-stroke-color': [
-        'case',
-        ['==', ['get', 'domain'], 'drone'], '#7c4dff',
-        'rgba(0,0,0,0.6)'
+        'case', ['==', ['get', 'domain'], 'drone'], '#7c4dff',
+        ['==', ['get', 'affiliation'], 'hostile'], 'rgba(239,83,80,0.6)',
+        'rgba(0,0,0,0.5)',
       ],
-      'circle-opacity': 0.85
-    }
+      'circle-opacity': [
+        'case', ['==', ['get', 'id'], S.selectedId || ''], 1, 0.82,
+      ],
+    },
   });
 
-  // ── Threat highlight rings ──
+  // ── Selected entity highlight ──
   map.addLayer({
-    id: 'threat-rings', type: 'circle', source: 'tracks',
-    filter: ['all',
-      ['!', ['has', 'point_count']],
-      ['>=', ['get', 'threat_level'], 4]
-    ],
+    id: 'entity-selected', type: 'circle', source: 'tracks',
+    filter: ['==', ['get', 'id'], ''],
     paint: {
       'circle-color': 'transparent',
-      'circle-stroke-color': [
-        'interpolate', ['linear'], ['get', 'threat_level'],
-        4, 'rgba(255,167,38,0.6)',
-        7, 'rgba(239,83,80,0.8)',
-        10, '#EF5350'
-      ],
-      'circle-stroke-width': [
-        'interpolate', ['linear'], ['get', 'threat_level'],
-        4, 1.5, 10, 3
-      ],
-      'circle-radius': [
-        'interpolate', ['linear'], ['zoom'],
-        2, 8, 8, 14, 14, 20
-      ]
-    }
+      'circle-stroke-color': '#ffffff',
+      'circle-stroke-width': 2,
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 2, 10, 8, 18, 14, 26],
+      'circle-opacity': 0.9,
+    },
   });
 
-  // ── Callsign labels (zoom >= 6) ──
+  // ── Callsign labels ──
   map.addLayer({
     id: 'labels-callsign', type: 'symbol', source: 'tracks',
     filter: ['!', ['has', 'point_count']],
@@ -514,393 +1226,1595 @@ map.on('load', function () {
     layout: {
       'text-field': ['get', 'callsign'],
       'text-font': ['Open Sans Semibold'],
-      'text-size': 10,
-      'text-offset': [0, 1.4],
+      'text-size': 9,
+      'text-offset': [0, 1.5],
       'text-anchor': 'top',
       'text-allow-overlap': false,
-      'text-optional': true
+      'text-optional': true,
     },
     paint: {
-      'text-color': '#e2e8f0',
-      'text-halo-color': 'rgba(10,14,23,0.9)',
-      'text-halo-width': 1.5
-    }
+      'text-color': '#d4dbe8',
+      'text-halo-color': 'rgba(8,12,20,0.95)',
+      'text-halo-width': 1.5,
+    },
   });
 
-  // ── Altitude/speed labels (zoom >= 8) ──
+  // ── Alt/speed detail labels ──
   map.addLayer({
     id: 'labels-detail', type: 'symbol', source: 'tracks',
     filter: ['!', ['has', 'point_count']],
-    minzoom: 8,
+    minzoom: 9,
     layout: {
-      'text-field': [
-        'concat',
-        ['case', ['has', 'altitude'], ['concat', ['to-string', ['get', 'altitude']], 'ft'], ''],
-        ' ',
-        ['case', ['has', 'speed'], ['concat', ['to-string', ['get', 'speed']], 'kt'], '']
+      'text-field': ['concat',
+        ['case', ['has', 'altitude_ft'], ['concat', ['to-string', ['get', 'altitude_ft']], 'ft '], ''],
+        ['case', ['has', 'speed_kts'], ['concat', ['to-string', ['get', 'speed_kts']], 'kt'], ''],
       ],
       'text-font': ['Open Sans Semibold'],
-      'text-size': 9,
-      'text-offset': [0, 2.6],
+      'text-size': 8,
+      'text-offset': [0, 2.8],
       'text-anchor': 'top',
       'text-allow-overlap': false,
-      'text-optional': true
+      'text-optional': true,
     },
     paint: {
-      'text-color': '#64748b',
-      'text-halo-color': 'rgba(10,14,23,0.8)',
-      'text-halo-width': 1
-    }
+      'text-color': '#4d6080',
+      'text-halo-color': 'rgba(8,12,20,0.8)',
+      'text-halo-width': 1,
+    },
+  });
+
+  // ── Heading arrows at high zoom ──
+  map.addLayer({
+    id: 'heading-arrows', type: 'symbol', source: 'tracks',
+    filter: ['all', ['!', ['has', 'point_count']], ['has', 'heading']],
+    minzoom: 8,
+    layout: {
+      'text-field': '▲',
+      'text-font': ['Open Sans Semibold'],
+      'text-size': 8,
+      'text-rotate': ['get', 'heading'],
+      'text-allow-overlap': true,
+      'text-ignore-placement': true,
+    },
+    paint: {
+      'text-color': [
+        'match', ['get', 'affiliation'],
+        'friendly', 'rgba(79,195,247,0.7)',
+        'hostile',  'rgba(239,83,80,0.7)',
+        'rgba(120,144,156,0.5)',
+      ],
+    },
   });
 
   // ── Interactions ──
-  map.on('click', 'entities', function (e) {
-    if (e.features.length > 0) {
-      showDetail(e.features[0].properties);
-    }
+  map.on('click', 'entities', e => {
+    if (e.features.length > 0) showDetail(e.features[0].properties);
   });
-
-  map.on('click', 'clusters', function (e) {
-    const clusterId = e.features[0].properties.cluster_id;
-    map.getSource('tracks').getClusterExpansionZoom(clusterId, function (err, zoom) {
+  map.on('click', 'clusters', e => {
+    const cid = e.features[0].properties.cluster_id;
+    map.getSource('tracks').getClusterExpansionZoom(cid, (err, zoom) => {
       if (err) return;
-      map.easeTo({ center: e.features[0].geometry.coordinates, zoom: zoom });
+      map.easeTo({ center: e.features[0].geometry.coordinates, zoom });
     });
   });
+  map.on('mouseenter', 'entities',  () => { map.getCanvas().style.cursor = 'pointer'; });
+  map.on('mouseleave', 'entities',  () => { map.getCanvas().style.cursor = ''; });
+  map.on('mouseenter', 'clusters',  () => { map.getCanvas().style.cursor = 'pointer'; });
+  map.on('mouseleave', 'clusters',  () => { map.getCanvas().style.cursor = ''; });
 
-  map.on('mouseenter', 'entities', function () { map.getCanvas().style.cursor = 'pointer'; });
-  map.on('mouseleave', 'entities', function () { map.getCanvas().style.cursor = ''; });
-  map.on('mouseenter', 'clusters', function () { map.getCanvas().style.cursor = 'pointer'; });
-  map.on('mouseleave', 'clusters', function () { map.getCanvas().style.cursor = ''; });
-
-  // Start refresh
-  refresh();
-  setInterval(refresh, 5000);
+  // ── Init UI — auth gate runs first ──
+  startClock();
+  authInit();   // shows login screen OR restores session, then calls hideLoading + initWebSocket
 });
 
-// ═══════════════ REFRESH ═══════════════
-async function refresh() {
-  try {
-    const center = map.getCenter();
-    const countryParam = state.activeCountry ? `&country=${state.activeCountry}` : '';
-    const url = `/api/tracks?lat=${center.lat.toFixed(2)}&lon=${center.lng.toFixed(2)}&radius_nm=250${countryParam}`;
-    const resp = await fetch(url);
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    const data = await resp.json();
+// ─────────────────────────────────────────────
+// WEBSOCKET
+// ─────────────────────────────────────────────
+let _ws = null;
+let _wsFallbackTimer = null;
 
-    // Inject freshness (1.0 = fresh, 0.0 = stale >5min)
-    const now = Date.now();
-    if (data.features) {
-      for (let i = 0; i < data.features.length; i++) {
-        const p = data.features[i].properties;
-        const age = p.last_seen ? (now - new Date(p.last_seen).getTime()) / 1000 : 300;
-        p.freshness = Math.max(0, Math.min(1, 1 - (age / 300)));
-        if (!p.domain) p.domain = 'unknown';
-        if (!p.affiliation) p.affiliation = 'unknown';
-        if (p.threat_level === undefined) p.threat_level = 0;
-      }
+function initWebSocket() {
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  const url = `${proto}://${location.host}/ws/tracks`;
+  _ws = new WebSocket(url);
+
+  _ws.onopen = () => {
+    setWsStatus('live');
+    document.getElementById('hud-refresh').textContent = 'WS';
+    if (_wsFallbackTimer) { clearInterval(_wsFallbackTimer); _wsFallbackTimer = null; }
+  };
+
+  _ws.onmessage = e => {
+    try {
+      const msg = JSON.parse(e.data);
+      if (msg.type === 'tracks') processData(msg.data);
+    } catch (_) {}
+  };
+
+  _ws.onclose = () => {
+    setWsStatus('err');
+    document.getElementById('hud-refresh').textContent = '5s';
+    // fallback to HTTP polling
+    if (!_wsFallbackTimer) {
+      _wsFallbackTimer = setInterval(pollFallback, 5000);
+      pollFallback();
     }
+    // reconnect after 8s
+    setTimeout(initWebSocket, 8000);
+  };
 
-    // Apply layer filters
-    const filtered = applyLayerFilters(data);
-    map.getSource('tracks').setData(filtered);
-    state.lastData = data;
-
-    // Update counts
-    updateBadges(data);
-    updateThreats(data);
-    updateCountries(data);
-    document.getElementById('chip-tracks').textContent = (data.features || []).length.toLocaleString();
-
-    setLiveStatus(true);
-  } catch (err) {
-    console.error('Refresh failed:', err);
-    setLiveStatus(false);
-  }
+  _ws.onerror = () => {
+    setWsStatus('err');
+  };
 }
 
-function applyLayerFilters(data) {
-  if (!data || !data.features) return emptyGeoJSON;
-  const features = data.features.filter(function (f) {
-    const d = f.properties.domain;
-    if (!state.layerToggles.air && d === 'air') return false;
-    if (!state.layerToggles.sea && d === 'sea') return false;
-    if (!state.layerToggles.thr && f.properties.threat_level >= 4) return false;
+async function pollFallback() {
+  try {
+    const r = await fetch('/api/tracks');
+    if (!r.ok) throw new Error();
+    const data = await r.json();
+    processData(data);
+  } catch (_) {}
+}
+
+function setWsStatus(state) {
+  S.wsConnected = state === 'live';
+  const dot = document.getElementById('ws-dot');
+  const lbl = document.getElementById('ws-label');
+  dot.className = 'ws-dot ' + state;
+  lbl.className = 'ws-label ' + state;
+  lbl.textContent = state === 'live' ? 'LIVE' : state === 'err' ? 'FAULT' : 'INIT';
+}
+
+// ─────────────────────────────────────────────
+// DATA PROCESSING
+// ─────────────────────────────────────────────
+function processData(data) {
+  if (!data || !data.features) return;
+  const now = Date.now();
+
+  // Update track history for trails
+  for (const f of data.features) {
+    const id = f.properties.id;
+    if (!id) continue;
+    const [lng, lat] = f.geometry.coordinates;
+    if (!S.trackHistory[id]) S.trackHistory[id] = [];
+    const hist = S.trackHistory[id];
+    // Only add if position changed meaningfully
+    const last = hist[hist.length - 1];
+    if (!last || Math.abs(last.lng - lng) > 0.001 || Math.abs(last.lat - lat) > 0.001) {
+      hist.push({ lng, lat, ts: now });
+      if (hist.length > TRAIL_MAX) hist.shift();
+    }
+  }
+
+  // Normalise properties
+  for (const f of data.features) {
+    const p = f.properties;
+    if (!p.domain) p.domain = 'unknown';
+    if (!p.affiliation) p.affiliation = 'unknown';
+    if (p.threat_level === undefined || p.threat_level === null) p.threat_level = 0;
+    if (typeof p.threat_level === 'string') p.threat_level = 0;
+    // add country hint from first part of callsign prefix (best-effort)
+    if (!p.country && p.callsign) p.country = '';
+  }
+
+  S.lastData = data;
+
+  // Apply layer visibility filter
+  const filtered = applyFilters(data);
+  map.getSource('tracks').setData(filtered);
+
+  updateCounters(data);
+  updateThreats(data);
+  updateCountries(data);
+  updateAlertMini(data);
+  drawTrails();
+
+  document.getElementById('hud-tracks').textContent = data.features.length.toLocaleString();
+}
+
+function applyFilters(data) {
+  if (!data || !data.features) return EMPTY_FC;
+  const features = data.features.filter(f => {
+    const p = f.properties;
+    if (!S.layers.air && p.domain === 'air') return false;
+    if (!S.layers.sea && p.domain === 'sea') return false;
+    if (!S.layers.drn && p.domain === 'drone') return false;
+    if (!S.layers.thr && p.threat_level >= 4) return false;
     return true;
   });
-  return { type: 'FeatureCollection', features: features };
+  return { type: 'FeatureCollection', features };
 }
 
-// ═══════════════ BADGES ═══════════════
-function updateBadges(data) {
-  if (!data || !data.features) return;
-  const features = data.features;
-  let air = 0, sea = 0, drone = 0, threat = 0;
-  for (let i = 0; i < features.length; i++) {
-    const p = features[i].properties;
-    if (p.domain === 'air') air++;
-    else if (p.domain === 'sea') sea++;
-    else if (p.domain === 'drone') drone++;
-    if (p.threat_level >= 4) threat++;
+// ─────────────────────────────────────────────
+// COUNTERS
+// ─────────────────────────────────────────────
+function updateCounters(data) {
+  let air = 0, sea = 0, drn = 0, thr = 0;
+  for (const f of data.features) {
+    const p = f.properties;
+    if (p.domain === 'air')   air++;
+    if (p.domain === 'sea')   sea++;
+    if (p.domain === 'drone') drn++;
+    if (p.threat_level >= 4)  thr++;
   }
-  document.getElementById('count-air').textContent = air.toLocaleString();
-  document.getElementById('count-sea').textContent = sea.toLocaleString();
-  document.getElementById('count-drone').textContent = drone.toLocaleString();
-  document.getElementById('count-threat').textContent = threat.toLocaleString();
+  document.getElementById('cnt-air').textContent = air.toLocaleString();
+  document.getElementById('cnt-sea').textContent = sea.toLocaleString();
+  document.getElementById('cnt-drn').textContent = drn.toLocaleString();
+  document.getElementById('cnt-thr').textContent = thr.toLocaleString();
 }
 
-// ═══════════════ THREATS ═══════════════
+// ─────────────────────────────────────────────
+// THREAT BOARD
+// ─────────────────────────────────────────────
 function updateThreats(data) {
-  if (!data || !data.features) return;
   const threats = data.features
-    .filter(function (f) { return f.properties.threat_level >= 4; })
-    .sort(function (a, b) { return b.properties.threat_level - a.properties.threat_level; });
+    .filter(f => f.properties.threat_level >= 4)
+    .sort((a, b) => b.properties.threat_level - a.properties.threat_level);
 
-  document.getElementById('threat-board-count').textContent = threats.length + ' ACTIVE';
+  document.getElementById('bp-cnt').textContent = threats.length + ' ACTIVE';
 
-  const tbody = document.getElementById('threat-tbody');
+  if (S.activeTab === 'threats') renderBoardRows(threats);
+}
+
+function renderBoardRows(items) {
+  const thead = document.getElementById('bp-thead');
+  const tbody = document.getElementById('bp-tbody');
+
+  thead.innerHTML = `<tr>
+    <th>LVL</th><th>ID / CALLSIGN</th><th>DOM</th><th>AFF</th>
+    <th>SPD</th><th>ALT</th><th>HDG</th><th>SEV</th><th>REASON</th><th>POSITION</th>
+  </tr>`;
+
   let html = '';
-  for (let i = 0; i < threats.length; i++) {
-    const p = threats[i].properties;
-    const coords = threats[i].geometry.coordinates;
-    const sev = p.threat_level >= 8 ? 'critical' : p.threat_level >= 6 ? 'high' : p.threat_level >= 4 ? 'medium' : 'low';
-    const sevLabel = sev.toUpperCase();
-    html += '<tr onclick="zoomToEntity(' + coords[1] + ',' + coords[0] + ',\'' + (p.callsign || p.id || '') + '\')">'
-      + '<td>' + p.threat_level + '</td>'
-      + '<td>' + (p.callsign || p.id || 'UNK') + '</td>'
-      + '<td>' + (p.domain || '').toUpperCase() + '</td>'
-      + '<td>' + (p.affiliation || 'UNK').toUpperCase() + '</td>'
-      + '<td>' + (p.speed ? p.speed + 'kt' : '--') + '</td>'
-      + '<td class="sev-' + sev + '">' + sevLabel + '</td>'
-      + '<td>' + (p.threat_reason || '--') + '</td>'
-      + '<td>' + (coords ? coords[1].toFixed(2) + ',' + coords[0].toFixed(2) : '--') + '</td>'
-      + '</tr>';
+  for (const f of items) {
+    const p = f.properties;
+    const [lng, lat] = f.geometry.coordinates;
+    const tl = p.threat_level || 0;
+    const sev = tl >= 8 ? 'crit' : tl >= 6 ? 'high' : tl >= 4 ? 'med' : 'low';
+    const sevLabel = tl >= 8 ? 'CRITICAL' : tl >= 6 ? 'HIGH' : tl >= 4 ? 'MEDIUM' : 'LOW';
+    const hdg = p.heading != null ? `${Math.round(p.heading)}&deg;` : '--';
+    const spd = p.speed_kts != null ? `${Math.round(p.speed_kts)}kt` : '--';
+    const alt = p.altitude_ft != null ? `${Math.round(p.altitude_ft).toLocaleString()}ft` : '--';
+    const pos = `${lat.toFixed(2)},${lng.toFixed(2)}`;
+    const reason = p.threat_reason || p.threat_category || '--';
+    const sel = p.id === S.selectedId ? 'selected' : '';
+    html += `<tr class="${sel}" onclick="rowClick('${escJ(p.id)}',${lat},${lng})">
+      <td>${tl}</td>
+      <td>${escH(p.callsign || p.id || 'UNK')}</td>
+      <td>${(p.domain || '').toUpperCase()}</td>
+      <td>${(p.affiliation || 'UNK').toUpperCase()}</td>
+      <td>${spd}</td><td>${alt}</td><td>${hdg}</td>
+      <td class="sev-${sev}">${sevLabel}</td>
+      <td>${escH(reason)}</td>
+      <td>${pos}</td>
+    </tr>`;
   }
   tbody.innerHTML = html;
 }
 
-// ═══════════════ COUNTRIES ═══════════════
-function updateCountries(data) {
-  if (!data || !data.features) return;
-  const countryMap = {};
-  for (let i = 0; i < data.features.length; i++) {
-    const c = data.features[i].properties.country;
-    if (c) {
-      if (!countryMap[c]) countryMap[c] = 0;
-      countryMap[c]++;
-    }
+function renderAllTracksRows(data) {
+  const thead = document.getElementById('bp-thead');
+  const tbody = document.getElementById('bp-tbody');
+  thead.innerHTML = `<tr>
+    <th>ID / CALLSIGN</th><th>DOM</th><th>AFF</th>
+    <th>SPD</th><th>ALT</th><th>HDG</th><th>THR</th><th>POSITION</th>
+  </tr>`;
+  const items = (data && data.features) ? data.features : [];
+  let html = '';
+  for (const f of items.slice(0, 200)) {
+    const p = f.properties;
+    const [lng, lat] = f.geometry.coordinates;
+    const tl = p.threat_level || 0;
+    const sev = tl >= 8 ? 'sev-crit' : tl >= 6 ? 'sev-high' : tl >= 4 ? 'sev-med' : 'sev-low';
+    const sel = p.id === S.selectedId ? 'selected' : '';
+    html += `<tr class="${sel}" onclick="rowClick('${escJ(p.id)}',${lat},${lng})">
+      <td>${escH(p.callsign || p.id || 'UNK')}</td>
+      <td>${(p.domain || '').toUpperCase()}</td>
+      <td>${(p.affiliation || 'UNK').toUpperCase()}</td>
+      <td>${p.speed_kts != null ? Math.round(p.speed_kts)+'kt' : '--'}</td>
+      <td>${p.altitude_ft != null ? Math.round(p.altitude_ft).toLocaleString()+'ft' : '--'}</td>
+      <td>${p.heading != null ? Math.round(p.heading)+'&deg;' : '--'}</td>
+      <td class="${sev}">${tl || '--'}</td>
+      <td>${lat.toFixed(2)},${lng.toFixed(2)}</td>
+    </tr>`;
   }
-  const sorted = Object.keys(countryMap).sort();
-  state.countries = sorted.map(function (code) {
-    return { code: code, count: countryMap[code] };
-  });
+  if (items.length > 200) {
+    html += `<tr><td colspan="8" style="color:var(--text-dim);text-align:center;padding:6px;">
+      +${(items.length-200).toLocaleString()} more (zoom in to filter)</td></tr>`;
+  }
+  tbody.innerHTML = html;
+}
+
+// ─────────────────────────────────────────────
+// ALERT MINI LIST (left sidebar)
+// ─────────────────────────────────────────────
+function updateAlertMini(data) {
+  const threats = data.features
+    .filter(f => f.properties.threat_level >= 4)
+    .sort((a, b) => b.properties.threat_level - a.properties.threat_level)
+    .slice(0, 8);
+
+  document.getElementById('alert-mini-cnt').textContent = threats.length;
+  const el = document.getElementById('alert-mini-list');
+  let html = '';
+  for (const f of threats) {
+    const p = f.properties;
+    const tl = p.threat_level || 0;
+    const sev = tl >= 8 ? 'crit' : tl >= 6 ? 'high' : 'med';
+    const sevLbl = tl >= 8 ? 'CRIT' : tl >= 6 ? 'HIGH' : 'MED';
+    const [lng, lat] = f.geometry.coordinates;
+    html += `<div class="alert-mini-item" onclick="rowClick('${escJ(p.id)}',${lat},${lng})">
+      <div class="al-sev ${sev}">${sevLbl}</div>
+      <div class="al-body">
+        <div class="al-id">${escH(p.callsign || p.id || 'UNK')}</div>
+        <div class="al-reason">${escH(p.threat_reason || p.threat_category || p.domain || '')}</div>
+      </div>
+    </div>`;
+  }
+  el.innerHTML = html;
+}
+
+// ─────────────────────────────────────────────
+// COUNTRIES
+// ─────────────────────────────────────────────
+function updateCountries(data) {
+  const cmap = {};
+  for (const f of data.features) {
+    const c = f.properties.country;
+    if (c) cmap[c] = (cmap[c] || 0) + 1;
+  }
+  S.countries = Object.keys(cmap).sort().map(c => ({ code: c, count: cmap[c] }));
   renderCountries('');
 }
 
 function renderCountries(filter) {
-  const listEl = document.getElementById('country-list');
-  const lower = filter.toLowerCase();
+  const el = document.getElementById('country-scroll');
+  const lc = filter.toLowerCase();
   let html = '';
-  for (let i = 0; i < state.countries.length; i++) {
-    const c = state.countries[i];
-    if (lower && c.code.toLowerCase().indexOf(lower) === -1) continue;
-    html += '<div class="country-item" onclick="selectCountry(\'' + c.code + '\')">'
-      + '<span>' + c.code + '</span>'
-      + '<span style="margin-left:auto;color:var(--text-muted);font-size:10px;">' + c.count + '</span>'
-      + '</div>';
+  for (const c of S.countries) {
+    if (lc && !c.code.toLowerCase().includes(lc)) continue;
+    const act = c.code === S.activeCountry ? 'active' : '';
+    html += `<div class="country-item ${act}" onclick="selectCountry('${c.code}')">
+      <span>${c.code.toUpperCase()}</span>
+      <span style="color:var(--text-dim)">${c.count}</span>
+    </div>`;
   }
-  listEl.innerHTML = html;
+  el.innerHTML = html;
 }
 
-function filterCountries(val) {
-  renderCountries(val);
-}
+function filterCountries(v) { renderCountries(v); }
 
-// ═══════════════ FOCUS / COUNTRY ═══════════════
-const FOCUS_REGIONS = [
-  { code: 'GLOBAL', label: 'GLOBAL', flag: '\u{1F310}' },
-  { code: 'CO', label: 'Colombia', flag: '\u{1F1E8}\u{1F1F4}' },
-  { code: 'PH', label: 'Philippines', flag: '\u{1F1F5}\u{1F1ED}' },
-  { code: 'EE', label: 'Estonia', flag: '\u{1F1EA}\u{1F1EA}' },
-  { code: 'GB', label: 'United Kingdom', flag: '\u{1F1EC}\u{1F1E7}' },
-  { code: 'FI', label: 'Finland', flag: '\u{1F1EB}\u{1F1EE}' },
-  { code: 'AU', label: 'Australia', flag: '\u{1F1E6}\u{1F1FA}' },
-  { code: 'JP', label: 'Japan', flag: '\u{1F1EF}\u{1F1F5}' }
-];
-
+// ─────────────────────────────────────────────
+// FOCUS / COUNTRY SELECT
+// ─────────────────────────────────────────────
 function initFocusList() {
   const el = document.getElementById('focus-list');
   let html = '';
-  for (let i = 0; i < FOCUS_REGIONS.length; i++) {
-    const r = FOCUS_REGIONS[i];
-    html += '<div class="focus-item' + (i === 0 ? ' active' : '') + '" data-code="' + r.code + '" onclick="focusRegion(this)">'
-      + '<span class="fi-flag">' + r.flag + '</span>'
-      + '<span class="fi-label">' + r.label.toUpperCase() + '</span>'
-      + '</div>';
+  for (const r of FOCUS_REGIONS) {
+    html += `<div class="focus-item${r.code === 'GLOBAL' ? ' active' : ''}"
+      data-code="${r.code}" onclick="focusRegion(this)">
+      <span class="fi-flag">${r.flag}</span>
+      <span class="fi-label">${r.label.toUpperCase()}</span>
+      <span class="fi-cnt" id="fi-cnt-${r.code}"></span>
+    </div>`;
   }
   el.innerHTML = html;
 }
 
 async function focusRegion(el) {
-  document.querySelectorAll('.focus-item').forEach(function (e) { e.classList.remove('active'); });
+  document.querySelectorAll('.focus-item').forEach(e => e.classList.remove('active'));
   el.classList.add('active');
   const code = el.dataset.code;
-
   if (code === 'GLOBAL') {
-    state.activeCountry = null;
-    document.getElementById('ctx-label').textContent = '';
+    S.activeCountry = null;
+    document.getElementById('ctx-label').textContent = 'GLOBAL';
+    document.getElementById('hud-region').textContent = 'GLOBAL';
     map.flyTo({ center: [0, 20], zoom: 2 });
   } else {
-    state.activeCountry = code;
-    document.getElementById('ctx-label').textContent = '\u2014 ' + (el.querySelector('.fi-label')?.textContent || code);
+    S.activeCountry = code;
+    document.getElementById('ctx-label').textContent = code.toUpperCase();
+    document.getElementById('hud-region').textContent = code.toUpperCase();
     try {
       const resp = await fetch('/api/country/' + code);
       if (resp.ok) {
         const info = await resp.json();
-        if (info.bounds) {
-          map.fitBounds(info.bounds, { padding: 50, maxZoom: 8 });
-        }
+        if (info.bounds) map.fitBounds(info.bounds, { padding: 50, maxZoom: 8 });
       }
-    } catch (err) {
-      console.warn('Country bounds fetch failed:', err);
-    }
+    } catch (_) {}
   }
-  refresh();
 }
 
 async function selectCountry(code) {
-  state.activeCountry = code;
-  document.getElementById('ctx-label').textContent = '\u2014 ' + code;
+  S.activeCountry = code;
+  document.getElementById('ctx-label').textContent = code.toUpperCase();
+  document.getElementById('hud-region').textContent = code.toUpperCase();
   try {
     const resp = await fetch('/api/country/' + code);
     if (resp.ok) {
       const info = await resp.json();
-      if (info.bounds) {
-        map.fitBounds(info.bounds, { padding: 50, maxZoom: 8 });
-      }
+      if (info.bounds) map.fitBounds(info.bounds, { padding: 50, maxZoom: 8 });
     }
-  } catch (err) {
-    console.warn('Country bounds fetch failed:', err);
-  }
-  refresh();
+  } catch (_) {}
+  renderCountries('');
 }
 
-// ═══════════════ DETAIL PANEL ═══════════════
+// ─────────────────────────────────────────────
+// ENTITY DETAIL PANEL
+// ─────────────────────────────────────────────
 function showDetail(props) {
-  state.selectedEntity = props;
+  if (typeof props === 'string') {
+    try { props = JSON.parse(props); } catch (_) { return; }
+  }
+  S.selectedId = props.id;
+
+  // Update selected highlight layer
+  map.setFilter('entity-selected', ['==', ['get', 'id'], props.id || '']);
+
   document.getElementById('app').classList.add('detail-open');
-  document.getElementById('detail-title').textContent = props.callsign || props.id || 'UNKNOWN';
+  document.getElementById('dr-title').textContent = props.callsign || props.id || 'UNKNOWN';
 
-  const affClass = 'aff-' + (props.affiliation || 'unknown');
-  const fields = [
-    ['ID', props.id || '--'],
-    ['Callsign', props.callsign || '--'],
-    ['Domain', (props.domain || '--').toUpperCase()],
-    ['Affiliation', '<span class="' + affClass + '">' + (props.affiliation || 'UNKNOWN').toUpperCase() + '</span>'],
-    ['Speed', props.speed ? props.speed + ' kt' : '--'],
-    ['Altitude', props.altitude ? props.altitude.toLocaleString() + ' ft' : '--'],
-    ['Heading', props.heading ? props.heading + '\u00B0' : '--'],
-    ['Country', props.country || '--'],
-    ['Source', props.source || '--'],
-    ['Last Seen', props.last_seen || '--']
-  ];
+  const tl = typeof props.threat_level === 'number' ? props.threat_level : 0;
+  const affCls = `aff-${props.affiliation || 'unknown'}`;
+  const thrColor = tl >= 8 ? 'var(--danger)' : tl >= 6 ? 'var(--warning)' : tl >= 4 ? '#fdd835' : 'var(--success)';
+  const thrBarW = Math.round(tl * 10);
 
-  let html = '';
-  for (let i = 0; i < fields.length; i++) {
-    html += '<div class="detail-row"><span class="detail-key">' + fields[i][0] + '</span><span class="detail-val">' + fields[i][1] + '</span></div>';
+  let html = `
+    <div class="dr-section-title">IDENTIFICATION</div>
+    ${dr('ID', props.id || '--')}
+    ${dr('Callsign', props.callsign || '--')}
+    ${dr('Domain', (props.domain || '--').toUpperCase())}
+    ${dr('Affiliation', `<span class="aff-pill ${affCls}">${(props.affiliation || 'UNKNOWN').toUpperCase()}</span>`)}
+    ${dr('CoT Type', props.cot_type || '--')}
+    <div class="dr-section-title">KINEMATICS</div>
+    ${dr('Speed', props.speed_kts != null ? `${Math.round(props.speed_kts)} kt` : '--')}
+    ${dr('Heading', props.heading != null ? `${Math.round(props.heading)}&deg;` : '--')}
+    ${dr('Altitude', props.altitude_ft != null ? `${Math.round(props.altitude_ft).toLocaleString()} ft` : (props.altitude_m != null ? `${Math.round(props.altitude_m)} m` : '--'))}
+    ${dr('Vert. Rate', props.vertical_rate_fpm != null ? `${props.vertical_rate_fpm} fpm` : '--')}
+    ${dr('On Ground', props.on_ground != null ? (props.on_ground ? 'YES' : 'NO') : '--')}
+    <div class="dr-section-title">INTELLIGENCE</div>
+    ${dr('Threat Level', `<span style="color:${thrColor};font-weight:700">${tl}</span> / 10`)}
+    <div class="threat-bar-wrap">
+      <div class="threat-bar-bg">
+        <div class="threat-bar-fill" style="width:${thrBarW}%;background:${thrColor}"></div>
+      </div>
+    </div>
+    ${dr('Threat Cat.', props.threat_category || '--')}
+    ${dr('Reasoning', '<span style="font-size:9px;color:var(--text-mid)">' + escH(props.reasoning || '--') + '</span>')}`;
+
+  // anomalies
+  let anomalies = [];
+  if (props.anomalies) {
+    try {
+      anomalies = typeof props.anomalies === 'string' ? JSON.parse(props.anomalies) : props.anomalies;
+    } catch (_) {}
+  }
+  if (Array.isArray(anomalies) && anomalies.length > 0) {
+    html += `<div class="dr-section-title">ANOMALIES (${anomalies.length})</div><div class="anomaly-list">`;
+    for (const a of anomalies) {
+      const isCrit = (a.type || '').includes('spoof') || (a.type || '').includes('military');
+      html += `<div class="anomaly-item${isCrit ? ' crit-anom' : ''}">
+        <b>${escH(a.type || 'ANOMALY')}</b>: ${escH(a.desc || '')}
+      </div>`;
+    }
+    html += '</div>';
   }
 
-  if (props.threat_level >= 4) {
-    html += '<div class="detail-section-title">THREAT ASSESSMENT</div>';
-    const sev = props.threat_level >= 8 ? 'CRITICAL' : props.threat_level >= 6 ? 'HIGH' : 'MEDIUM';
-    const sevClass = props.threat_level >= 8 ? 'sev-critical' : props.threat_level >= 6 ? 'sev-high' : 'sev-medium';
-    html += '<div class="detail-row"><span class="detail-key">Level</span><span class="detail-val ' + sevClass + '">' + props.threat_level + ' / 10</span></div>';
-    html += '<div class="detail-row"><span class="detail-key">Severity</span><span class="detail-val ' + sevClass + '">' + sev + '</span></div>';
-    html += '<div class="detail-row"><span class="detail-key">Reason</span><span class="detail-val">' + (props.threat_reason || '--') + '</span></div>';
+  // domain-specific fields
+  if (props.domain === 'air') {
+    html += `<div class="dr-section-title">ADS-B DATA</div>
+      ${dr('ICAO Hex', props.icao_hex || '--')}
+      ${dr('Aircraft Type', props.aircraft_type || '--')}
+      ${dr('Registration', props.registration || '--')}
+      ${dr('Squawk', props.squawk || '--')}`;
+  } else if (props.domain === 'sea') {
+    html += `<div class="dr-section-title">AIS DATA</div>
+      ${dr('MMSI', props.mmsi || '--')}
+      ${dr('Ship Type', props.ship_type != null ? props.ship_type : '--')}
+      ${dr('Destination', props.destination || '--')}
+      ${dr('Nav Status', props.nav_status || '--')}`;
+  } else if (props.domain === 'drone') {
+    html += `<div class="dr-section-title">DRONE DATA</div>
+      ${dr('Mission', props.mission || '--')}
+      ${dr('Alt (m)', props.altitude_m != null ? props.altitude_m : '--')}`;
   }
 
-  if (props.mmsi) html += '<div class="detail-row"><span class="detail-key">MMSI</span><span class="detail-val">' + props.mmsi + '</span></div>';
-  if (props.imo) html += '<div class="detail-row"><span class="detail-key">IMO</span><span class="detail-val">' + props.imo + '</span></div>';
-  if (props.icao) html += '<div class="detail-row"><span class="detail-key">ICAO</span><span class="detail-val">' + props.icao + '</span></div>';
-  if (props.squawk) html += '<div class="detail-row"><span class="detail-key">Squawk</span><span class="detail-val">' + props.squawk + '</span></div>';
+  document.getElementById('dr-body').innerHTML = html;
 
-  document.getElementById('detail-body').innerHTML = html;
+  // action buttons
+  const [lng, lat] = (() => {
+    if (S.lastData) {
+      const f = S.lastData.features.find(x => x.properties.id === props.id);
+      if (f) return f.geometry.coordinates;
+    }
+    return [0, 0];
+  })();
+
+  const isDrone = (props.domain === 'drone');
+  document.getElementById('dr-actions').innerHTML = `
+    <div class="dr-section-title" style="margin-top:0">OPERATOR ACTIONS</div>
+    <button class="dr-btn" onclick="zoomToEntity(${lat},${lng})">&#9654; ZOOM TO ENTITY</button>
+    ${isDrone ? `<button class="dr-btn" style="border-color:var(--drone-col);color:var(--drone-col);"
+      onclick="openTaskingForDrone('${escJ(props.id)}')">&#9670; ASSIGN MISSION TASK</button>` : ''}
+    <button class="dr-btn" onclick="markFriendly('${escJ(props.id)}','${escJ(props.callsign || '')}')">&#9733; MARK FRIENDLY</button>
+    <button class="dr-btn hostile-btn" onclick="markHostile('${escJ(props.id)}','${escJ(props.callsign || '')}')">&#9888; MARK HOSTILE</button>
+    <button class="dr-btn" onclick="addWatchlist('${escJ(props.id)}','${escJ(props.callsign || '')}')">&#9673; ADD WATCHLIST</button>
+    <button class="dr-btn" onclick="closeDetail()">&#10005; CLOSE</button>
+  `;
+}
+
+function dr(k, v) {
+  return `<div class="dr-row"><span class="dr-key">${k}</span><span class="dr-val">${v}</span></div>`;
 }
 
 function closeDetail() {
+  S.selectedId = null;
+  map.setFilter('entity-selected', ['==', ['get', 'id'], '']);
   document.getElementById('app').classList.remove('detail-open');
-  state.selectedEntity = null;
 }
 
-// ═══════════════ LAYER TOGGLES ═══════════════
+// ─────────────────────────────────────────────
+// OPERATOR ACTIONS
+// ─────────────────────────────────────────────
+function markFriendly(id, callsign) {
+  const [idType, idVal] = _parseEntityId(id);
+  fetch('/api/operator/watchlist', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ identifier: idVal, identifier_type: idType,
+      affiliation: 'friendly', reason: 'Operator override', added_by: 'COP-dashboard' }),
+  }).then(() => showNotice(`${callsign || id} marked FRIENDLY`));
+}
+
+function markHostile(id, callsign) {
+  const [idType, idVal] = _parseEntityId(id);
+  fetch('/api/operator/watchlist', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ identifier: idVal, identifier_type: idType,
+      affiliation: 'hostile', reason: 'Operator override', added_by: 'COP-dashboard' }),
+  }).then(() => showNotice(`${callsign || id} marked HOSTILE`));
+}
+
+function addWatchlist(id, callsign) {
+  const [idType, idVal] = _parseEntityId(id);
+  fetch('/api/operator/watchlist', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ identifier: idVal, identifier_type: idType,
+      affiliation: 'suspect', reason: 'Watchlist add', added_by: 'COP-dashboard' }),
+  }).then(() => showNotice(`${callsign || id} added to watchlist`));
+}
+
+function _parseEntityId(id) {
+  if (id.startsWith('AIS-')) return ['mmsi', id.replace('AIS-', '')];
+  if (id.startsWith('ADSB-')) return ['icao', id.replace('ADSB-', '')];
+  return ['icao', id];
+}
+
+// simple toast notification
+function showNotice(msg) {
+  const el = document.createElement('div');
+  el.textContent = msg;
+  Object.assign(el.style, {
+    position: 'fixed', bottom: '160px', left: '50%', transform: 'translateX(-50%)',
+    background: 'var(--panel2)', border: '1px solid var(--accent)', color: 'var(--accent)',
+    padding: '6px 16px', fontSize: '10px', letterSpacing: '1px', zIndex: '5000',
+    fontFamily: 'JetBrains Mono,monospace', fontWeight: '700',
+    opacity: '0', transition: 'opacity .2s',
+  });
+  document.body.appendChild(el);
+  setTimeout(() => el.style.opacity = '1', 10);
+  setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 300); }, 2500);
+}
+
+// ─────────────────────────────────────────────
+// TRACK HISTORY TRAILS (canvas overlay)
+// ─────────────────────────────────────────────
+function drawTrails() {
+  if (!S.layers.trl) { clearTrails(); return; }
+  const canvas = document.getElementById('trail-canvas');
+  const wrap = document.getElementById('map-wrap');
+  canvas.width = wrap.clientWidth;
+  canvas.height = wrap.clientHeight;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  const now = Date.now();
+  for (const [id, hist] of Object.entries(S.trackHistory)) {
+    if (hist.length < 2) continue;
+    ctx.beginPath();
+    let started = false;
+    for (let i = 0; i < hist.length; i++) {
+      const pt = map.project([hist[i].lng, hist[i].lat]);
+      if (!started) { ctx.moveTo(pt.x, pt.y); started = true; }
+      else ctx.lineTo(pt.x, pt.y);
+    }
+    const age = now - hist[0].ts;
+    const alpha = Math.max(0.05, Math.min(0.5, 1 - age / 120000));
+    // color by domain
+    const feat = S.lastData && S.lastData.features.find(f => f.properties.id === id);
+    const domain = feat ? feat.properties.domain : 'unknown';
+    const baseColor = domain === 'air' ? '79,195,247' : domain === 'sea' ? '102,187,106' :
+                      domain === 'drone' ? '124,77,255' : '120,144,156';
+    ctx.strokeStyle = `rgba(${baseColor},${alpha})`;
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 3]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+}
+
+function clearTrails() {
+  const canvas = document.getElementById('trail-canvas');
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+}
+
+// Redraw trails on map move
+map.on('move', drawTrails);
+map.on('zoom', drawTrails);
+
+// ─────────────────────────────────────────────
+// GEOFENCE LAYER TOGGLE
+// ─────────────────────────────────────────────
+function setGeoVisible(visible) {
+  for (const z of GEOFENCE_ZONES) {
+    const vis = visible ? 'visible' : 'none';
+    if (map.getLayer(`geo-fill-${z.id}`)) map.setLayoutProperty(`geo-fill-${z.id}`, 'visibility', vis);
+    if (map.getLayer(`geo-line-${z.id}`)) map.setLayoutProperty(`geo-line-${z.id}`, 'visibility', vis);
+  }
+}
+
+// ─────────────────────────────────────────────
+// LAYER TOGGLES
+// ─────────────────────────────────────────────
 function toggleLayer(btn) {
   const layer = btn.dataset.layer;
-  state.layerToggles[layer] = !state.layerToggles[layer];
-  btn.classList.toggle('on');
-  if (state.lastData) {
-    const filtered = applyLayerFilters(state.lastData);
-    map.getSource('tracks').setData(filtered);
+  S.layers[layer] = !S.layers[layer];
+  btn.classList.toggle('on', S.layers[layer]);
+
+  if (layer === 'geo') {
+    setGeoVisible(S.layers.geo);
+  } else if (layer === 'trl') {
+    if (!S.layers.trl) clearTrails();
+    else drawTrails();
+  } else if (S.lastData) {
+    map.getSource('tracks').setData(applyFilters(S.lastData));
   }
 }
 
-// ═══════════════ THREAT BOARD TOGGLE ═══════════════
-function toggleThreats() {
-  const board = document.getElementById('threat-board');
-  const label = document.getElementById('threat-expand-label');
-  state.threatExpanded = !state.threatExpanded;
-  if (state.threatExpanded) {
-    board.classList.add('expanded');
-    label.innerHTML = '&#9650; COLLAPSE';
+// ─────────────────────────────────────────────
+// BOTTOM PANEL
+// ─────────────────────────────────────────────
+function toggleBottomPanel() {
+  S.bottomCollapsed = !S.bottomCollapsed;
+  const bp = document.getElementById('bottom-panel');
+  const wrap = document.getElementById('bp-table-wrap');
+  const lbl = document.getElementById('bp-expand');
+  if (S.bottomCollapsed) {
+    wrap.style.display = 'none';
+    lbl.textContent = '\u25BC EXPAND';
+    bp.style.height = '28px';
   } else {
-    board.classList.remove('expanded');
-    label.innerHTML = '&#9660; EXPAND';
+    wrap.style.display = '';
+    lbl.textContent = '\u25B2 COLLAPSE';
+    bp.style.height = '';
   }
 }
 
-// ═══════════════ ZOOM TO ENTITY ═══════════════
-function zoomToEntity(lat, lon, callsign) {
-  map.flyTo({ center: [lon, lat], zoom: 10 });
-  // Try to find and select the entity
-  if (state.lastData && state.lastData.features) {
-    for (let i = 0; i < state.lastData.features.length; i++) {
-      const f = state.lastData.features[i];
-      if (f.properties.callsign === callsign || f.properties.id === callsign) {
-        showDetail(f.properties);
-        break;
-      }
+function switchTab(btn) {
+  document.querySelectorAll('.bp-tab').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+  S.activeTab = btn.dataset.tab;
+  if (S.lastData) {
+    if (S.activeTab === 'threats') updateThreats(S.lastData);
+    else renderAllTracksRows(S.lastData);
+  }
+}
+
+// ─────────────────────────────────────────────
+// ZOOM / NAVIGATE
+// ─────────────────────────────────────────────
+function rowClick(id, lat, lng) {
+  S.selectedId = id;
+  map.setFilter('entity-selected', ['==', ['get', 'id'], id]);
+  map.flyTo({ center: [lng, lat], zoom: Math.max(map.getZoom(), 7), duration: 800 });
+  if (S.lastData) {
+    const f = S.lastData.features.find(x => x.properties.id === id);
+    if (f) showDetail(f.properties);
+  }
+}
+
+function zoomToEntity(lat, lng) {
+  map.flyTo({ center: [lng, lat], zoom: 10, duration: 1000 });
+}
+
+// ─────────────────────────────────────────────
+// CLOCK
+// ─────────────────────────────────────────────
+function startClock() {
+  function tick() {
+    const now = new Date();
+    const h = String(now.getUTCHours()).padStart(2,'0');
+    const m = String(now.getUTCMinutes()).padStart(2,'0');
+    const s = String(now.getUTCSeconds()).padStart(2,'0');
+    document.getElementById('utc-clock').textContent = `${h}:${m}:${s}Z`;
+  }
+  tick();
+  setInterval(tick, 1000);
+}
+
+// ─────────────────────────────────────────────
+// LOADING SCREEN
+// ─────────────────────────────────────────────
+function hideLoading() {
+  setTimeout(() => {
+    const el = document.getElementById('loading');
+    el.classList.add('fade');
+    setTimeout(() => el.remove(), 450);
+  }, 1400);
+}
+
+// ─────────────────────────────────────────────
+// UTILS
+// ─────────────────────────────────────────────
+function escH(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function escJ(s) {
+  return String(s || '').replace(/'/g,"\\'").replace(/\\/g,'\\\\');
+}
+
+// ─────────────────────────────────────────────
+// AUTH — JWT login / token management
+// ─────────────────────────────────────────────
+const AUTH = {
+  accessToken:  null,
+  refreshToken: null,
+  role:         null,
+  username:     null,
+  refreshTimer: null,
+};
+const TOKEN_KEY   = 'mpe_access';
+const REFRESH_KEY = 'mpe_refresh';
+const ACCESS_TTL  = 15 * 60 * 1000;   // 15 min in ms
+const REFRESH_GAP = 13 * 60 * 1000;   // refresh 2 min before expiry
+
+// Restore session from sessionStorage on page load
+function authInit() {
+  const access  = sessionStorage.getItem(TOKEN_KEY);
+  const refresh = sessionStorage.getItem(REFRESH_KEY);
+  if (access && refresh) {
+    // Attempt silent refresh — if the token is still valid, proceed
+    _silentRefresh(refresh);
+  } else {
+    _showLoginScreen();
+  }
+}
+
+async function _silentRefresh(refreshToken) {
+  try {
+    const resp = await fetch('/api/auth/refresh', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    });
+    if (!resp.ok) throw new Error('refresh failed');
+    const data = await resp.json();
+    _storeTokens(data);
+    _onAuthSuccess(data.username, data.role);
+  } catch (_) {
+    sessionStorage.removeItem(TOKEN_KEY);
+    sessionStorage.removeItem(REFRESH_KEY);
+    _showLoginScreen();
+  }
+}
+
+function _storeTokens(data) {
+  AUTH.accessToken  = data.access_token;
+  AUTH.refreshToken = data.refresh_token;
+  AUTH.role         = data.role;
+  AUTH.username     = data.username;
+  sessionStorage.setItem(TOKEN_KEY,   data.access_token);
+  sessionStorage.setItem(REFRESH_KEY, data.refresh_token);
+  // Schedule token refresh before expiry
+  if (AUTH.refreshTimer) clearTimeout(AUTH.refreshTimer);
+  AUTH.refreshTimer = setTimeout(() => _silentRefresh(AUTH.refreshToken), REFRESH_GAP);
+}
+
+function _onAuthSuccess(username, role) {
+  // Hide login screen
+  document.getElementById('login-screen').classList.add('hidden');
+
+  // Update topbar user badge
+  const badge     = document.getElementById('user-badge');
+  const roleBadge = document.getElementById('user-role-badge');
+  const nameBadge = document.getElementById('user-name-badge');
+  const logoutBtn = document.getElementById('logout-btn');
+  badge.style.display   = 'flex';
+  logoutBtn.style.display = 'block';
+  roleBadge.textContent = role.toUpperCase();
+  roleBadge.className   = `user-role role-${role}`;
+  nameBadge.textContent = username;
+
+  // Grey out write actions for viewer role
+  if (role === 'viewer') _applyViewerRestrictions();
+
+  // Patch fetch to inject Authorization header for /api/operator/* calls
+  _patchFetch();
+
+  // Start the map data feed (map itself is already initialized)
+  initFocusList();
+  initWebSocket();
+  hideLoading();
+}
+
+function _showLoginScreen() {
+  document.getElementById('login-screen').classList.remove('hidden');
+}
+
+// Intercept fetch to inject Bearer token on operator API calls
+function _patchFetch() {
+  const _origFetch = window.fetch.bind(window);
+  window.fetch = function(url, opts = {}) {
+    const urlStr = typeof url === 'string' ? url : url.toString();
+    if (AUTH.accessToken && (urlStr.startsWith('/api/operator') || urlStr.startsWith('/api/auth/logout'))) {
+      opts = { ...opts, headers: { ...(opts.headers || {}), Authorization: `Bearer ${AUTH.accessToken}` } };
+    }
+    return _origFetch(url, opts);
+  };
+}
+
+function _applyViewerRestrictions() {
+  // Disable write-action buttons for viewer role
+  const writeIds = ['btn-tasking', 'btn-nlquery'];
+  for (const id of writeIds) {
+    const el = document.getElementById(id);
+    if (el) {
+      el.disabled = true;
+      el.title = 'Operator role required';
+      el.style.opacity = '0.4';
+      el.style.cursor = 'not-allowed';
     }
   }
 }
 
-// ═══════════════ LIVE STATUS ═══════════════
-function setLiveStatus(online) {
-  const dot = document.getElementById('live-dot');
-  const label = document.getElementById('live-label');
-  if (online) {
-    dot.style.background = 'var(--success)';
-    label.style.color = 'var(--success)';
-    label.textContent = 'LIVE';
-  } else {
-    dot.style.background = 'var(--danger)';
-    dot.style.animation = 'none';
-    label.style.color = 'var(--danger)';
-    label.textContent = 'OFFLINE';
+// Login form
+async function doLogin() {
+  const username = document.getElementById('login-user').value.trim();
+  const password = document.getElementById('login-pass').value;
+  const errorEl  = document.getElementById('login-error');
+  const btn       = document.getElementById('login-btn');
+
+  errorEl.classList.remove('show');
+  if (!username || !password) {
+    errorEl.textContent = 'Username and password required';
+    errorEl.classList.add('show');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'AUTHENTICATING...';
+
+  try {
+    const resp = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    });
+    const data = await resp.json();
+    if (!resp.ok) {
+      throw new Error(data.detail || 'Authentication failed');
+    }
+    _storeTokens(data);
+    _onAuthSuccess(data.username, data.role);
+    document.getElementById('login-pass').value = '';
+  } catch (err) {
+    errorEl.textContent = err.message;
+    errorEl.classList.add('show');
+    btn.disabled = false;
+    btn.textContent = '▶ AUTHENTICATE';
   }
 }
 
-// ═══════════════ UTC CLOCK ═══════════════
-function updateClock() {
-  const now = new Date();
-  const h = String(now.getUTCHours()).padStart(2, '0');
-  const m = String(now.getUTCMinutes()).padStart(2, '0');
-  const s = String(now.getUTCSeconds()).padStart(2, '0');
-  document.getElementById('utc-clock').textContent = h + ':' + m + ':' + s + 'Z';
+async function doLogout() {
+  try {
+    await fetch('/api/auth/logout', { method: 'POST' });
+  } catch (_) {}
+  sessionStorage.removeItem(TOKEN_KEY);
+  sessionStorage.removeItem(REFRESH_KEY);
+  if (AUTH.refreshTimer) clearTimeout(AUTH.refreshTimer);
+  AUTH.accessToken = AUTH.refreshToken = AUTH.role = AUTH.username = null;
+  // Stop WebSocket
+  if (_ws) { _ws.close(); _ws = null; }
+  if (_wsFallbackTimer) { clearInterval(_wsFallbackTimer); _wsFallbackTimer = null; }
+  // Reload page cleanly
+  location.reload();
 }
-setInterval(updateClock, 1000);
-updateClock();
 
-// ═══════════════ INIT ═══════════════
-initFocusList();
+function loginKeydown(e) {
+  if (e.key === 'Enter') doLogin();
+}
+
+// ─────────────────────────────────────────────
+// PANEL MANAGER
+// ─────────────────────────────────────────────
+const PANELS = ['tasking', 'sitrep', 'nlquery', 'playback'];
+
+function togglePanel(name) {
+  const overlay = document.getElementById(`overlay-${name}`);
+  const panel   = document.getElementById(`panel-${name}`);
+  const btn     = document.getElementById(`btn-${name}`);
+  const isOpen  = panel.classList.contains('open');
+
+  // Close all panels first
+  for (const p of PANELS) {
+    document.getElementById(`panel-${p}`).classList.remove('open');
+    document.getElementById(`overlay-${p}`).classList.remove('active');
+    const b = document.getElementById(`btn-${p}`);
+    if (b) b.classList.remove('active');
+  }
+
+  if (!isOpen) {
+    panel.classList.add('open');
+    overlay.classList.add('active');
+    if (btn) btn.classList.add('active');
+    // side effects on open
+    if (name === 'sitrep')   loadSitrep();
+    if (name === 'playback') pbInit();
+  }
+}
+
+// Close panels on overlay background click
+for (const p of PANELS) {
+  document.addEventListener('DOMContentLoaded', () => {
+    const overlay = document.getElementById(`overlay-${p}`);
+    if (overlay) {
+      overlay.addEventListener('click', e => {
+        if (e.target === overlay) togglePanel(p);
+      });
+    }
+  });
+}
+
+// ─────────────────────────────────────────────
+// MISSION TASKING
+// ─────────────────────────────────────────────
+const taskingState = {
+  waypoints: [],   // [{lat, lng, alt}]
+  drawMode: false,
+  submittedTasks: [],
+};
+
+function toggleDrawMode() {
+  taskingState.drawMode = !taskingState.drawMode;
+  const btn = document.getElementById('btn-draw-toggle');
+  const hint = document.getElementById('draw-hint');
+  if (taskingState.drawMode) {
+    btn.textContent = '⬛ STOP DRAWING';
+    btn.style.borderColor = 'var(--accent)';
+    btn.style.color = 'var(--accent)';
+    hint.classList.add('active');
+    hint.textContent = 'DRAWING ACTIVE — click map to drop waypoints';
+    map.getCanvas().style.cursor = 'crosshair';
+    map.on('click', onMapDrawClick);
+  } else {
+    btn.textContent = '◯ START DRAWING';
+    btn.style.borderColor = '';
+    btn.style.color = '';
+    hint.classList.remove('active');
+    hint.textContent = 'Click MAP to drop waypoints — or enter coordinates below';
+    map.getCanvas().style.cursor = '';
+    map.off('click', onMapDrawClick);
+  }
+}
+
+function onMapDrawClick(e) {
+  // Don't fire if clicking on an entity
+  if (e.features && e.features.length > 0) return;
+  const { lat, lng } = e.lngLat;
+  const alt = parseFloat(document.getElementById('task-alt').value) || 50;
+  addWaypoint(lat, lng, alt);
+}
+
+function addWaypoint(lat, lng, alt) {
+  taskingState.waypoints.push({ lat, lng, alt });
+  renderWaypointList();
+  // Drop a marker on the map
+  _syncWaypointMarkers();
+}
+
+function addWaypointManual() {
+  const lat = parseFloat(document.getElementById('wp-lat').value);
+  const lng = parseFloat(document.getElementById('wp-lon').value);
+  const alt = parseFloat(document.getElementById('wp-alt-input').value) || 50;
+  if (isNaN(lat) || isNaN(lng)) { showNotice('Enter valid lat/lon'); return; }
+  addWaypoint(lat, lng, alt);
+  document.getElementById('wp-lat').value = '';
+  document.getElementById('wp-lon').value = '';
+}
+
+function clearWaypoints() {
+  taskingState.waypoints = [];
+  renderWaypointList();
+  _clearWaypointMarkers();
+}
+
+function deleteWaypoint(i) {
+  taskingState.waypoints.splice(i, 1);
+  renderWaypointList();
+  _syncWaypointMarkers();
+}
+
+function renderWaypointList() {
+  const el = document.getElementById('waypoint-list');
+  if (taskingState.waypoints.length === 0) {
+    el.innerHTML = '<div style="font-size:9px;color:var(--text-dim);padding:4px 0;">No waypoints added</div>';
+    return;
+  }
+  let html = '';
+  for (let i = 0; i < taskingState.waypoints.length; i++) {
+    const w = taskingState.waypoints[i];
+    html += `<div class="waypoint-item">
+      <span class="wp-num">${i + 1}</span>
+      <span class="wp-coords">${w.lat.toFixed(4)}, ${w.lng.toFixed(4)}</span>
+      <span class="wp-alt">${w.alt}m</span>
+      <button class="wp-del" onclick="deleteWaypoint(${i})">&#10005;</button>
+    </div>`;
+  }
+  el.innerHTML = html;
+}
+
+// Waypoint markers on map
+const _wpMarkers = [];
+
+function _syncWaypointMarkers() {
+  _clearWaypointMarkers();
+  for (let i = 0; i < taskingState.waypoints.length; i++) {
+    const w = taskingState.waypoints[i];
+    const el = document.createElement('div');
+    el.style.cssText = `
+      width:18px;height:18px;border-radius:50%;border:2px solid #7c4dff;
+      background:rgba(124,77,255,.3);display:flex;align-items:center;
+      justify-content:center;font-size:9px;font-weight:700;color:#fff;
+      font-family:monospace;cursor:pointer;
+    `;
+    el.textContent = i + 1;
+    const marker = new maplibregl.Marker({ element: el })
+      .setLngLat([w.lng, w.lat])
+      .addTo(map);
+    _wpMarkers.push(marker);
+  }
+  // Draw route line
+  _drawWaypointRoute();
+}
+
+function _clearWaypointMarkers() {
+  for (const m of _wpMarkers) m.remove();
+  _wpMarkers.length = 0;
+  if (map.getSource('wp-route')) {
+    map.getSource('wp-route').setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: [] }, properties: {} });
+  }
+}
+
+function _drawWaypointRoute() {
+  const coords = taskingState.waypoints.map(w => [w.lng, w.lat]);
+  if (!map.getSource('wp-route')) {
+    map.addSource('wp-route', {
+      type: 'geojson',
+      data: { type: 'Feature', geometry: { type: 'LineString', coordinates: coords }, properties: {} },
+    });
+    map.addLayer({
+      id: 'wp-route-line', type: 'line', source: 'wp-route',
+      paint: {
+        'line-color': '#7c4dff',
+        'line-width': 1.5,
+        'line-dasharray': [4, 3],
+        'line-opacity': 0.7,
+      },
+    });
+  } else {
+    map.getSource('wp-route').setData({
+      type: 'Feature',
+      geometry: { type: 'LineString', coordinates: coords },
+      properties: {},
+    });
+  }
+}
+
+async function submitTask() {
+  if (taskingState.waypoints.length === 0) { showNotice('Add at least one waypoint'); return; }
+  const droneId   = document.getElementById('task-drone-id').value;
+  const taskType  = document.getElementById('task-type').value;
+  const priority  = parseInt(document.getElementById('task-priority').value) || 5;
+  const maxAlt    = parseFloat(document.getElementById('task-alt').value) || 120;
+  const maxSpeed  = parseFloat(document.getElementById('task-speed').value) || 20;
+  const notes     = document.getElementById('task-notes').value.trim();
+
+  const payload = {
+    drone_id: droneId,
+    task_type: taskType,
+    priority,
+    max_altitude_m: maxAlt,
+    max_speed_mps: maxSpeed,
+    notes,
+    submitted_by: 'cop-dashboard',
+    waypoints: taskingState.waypoints.map(w => ({
+      latitude: w.lat,
+      longitude: w.lng,
+      altitude_m: w.alt,
+    })),
+  };
+
+  const btn = document.getElementById('btn-submit-task');
+  btn.disabled = true;
+  btn.textContent = 'SUBMITTING...';
+
+  try {
+    const resp = await fetch('/api/operator/task', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const result = await resp.json();
+    taskingState.submittedTasks.unshift(result);
+    renderTaskHistory();
+    showNotice(`Task ${result.plan_id} submitted to ${droneId}`);
+    clearWaypoints();
+    document.getElementById('task-notes').value = '';
+    if (taskingState.drawMode) toggleDrawMode();
+  } catch (err) {
+    showNotice(`Submit failed: ${err.message}`);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '▶ SUBMIT TASK PLAN';
+  }
+}
+
+function renderTaskHistory() {
+  const el = document.getElementById('task-history');
+  if (taskingState.submittedTasks.length === 0) {
+    el.innerHTML = '<div style="font-size:9px;color:var(--text-dim);padding:3px 0;">No tasks submitted this session</div>';
+    return;
+  }
+  let html = '';
+  for (const t of taskingState.submittedTasks.slice(0, 8)) {
+    html += `<div class="task-history-item">
+      <span class="task-status-pill ts-planned">${(t.task_type || 'task').toUpperCase()}</span>
+      <span style="flex:1;font-size:10px;">${escH(t.plan_id)}</span>
+      <span style="color:var(--text-dim);font-size:9px;">${escH(t.drone_id)}</span>
+      <span style="color:var(--text-dim);font-size:9px;margin-left:6px;">${t.waypoint_count}wp</span>
+    </div>`;
+  }
+  el.innerHTML = html;
+}
+
+// Open tasking panel pre-filled for a specific drone
+function openTaskingForDrone(id) {
+  togglePanel('tasking');
+  if (id.startsWith('DRONE-')) {
+    const sel = document.getElementById('task-drone-id');
+    if (sel) sel.value = id;
+  }
+}
+
+// ─────────────────────────────────────────────
+// SITREP
+// ─────────────────────────────────────────────
+let _sitrepCache = null;
+let _sitrepLoading = false;
+
+async function loadSitrep() {
+  if (_sitrepLoading) return;
+  _sitrepLoading = true;
+  const body = document.getElementById('sitrep-body');
+  const format = document.getElementById('sitrep-format').value;
+
+  body.innerHTML = `<div class="sitrep-loading">
+    <div class="sitrep-spinner"></div>
+    <span>Generating ${format.toUpperCase()} SITREP...</span>
+  </div>`;
+
+  try {
+    // Fetch both structured and narrative in parallel
+    const [structResp, narrativeResp] = await Promise.all([
+      fetch('/api/operator/sitrep'),
+      fetch(`/api/operator/sitrep/narrative?format=${format}`),
+    ]);
+
+    const structData   = structResp.ok   ? await structResp.json()    : null;
+    const narrativeData = narrativeResp.ok ? await narrativeResp.json() : null;
+
+    _sitrepCache = { struct: structData, narrative: narrativeData };
+    renderSitrep(_sitrepCache, format);
+  } catch (err) {
+    body.innerHTML = `<div class="nl-result error">Failed to load SITREP: ${escH(err.message)}</div>`;
+  } finally {
+    _sitrepLoading = false;
+  }
+}
+
+function renderSitrep(data, format) {
+  const body = document.getElementById('sitrep-body');
+  const s = data.struct && data.struct.sitrep;
+  const n = data.narrative;
+  let html = '';
+
+  if (s && s.generated_at) {
+    html += `<div class="sitrep-section">
+      <div class="sitrep-heading">SUMMARY — ${new Date(s.generated_at).toUTCString()}</div>`;
+    const sum = s.summary || {};
+    const kvs = [
+      ['Classification', s.classification || 'UNCLASSIFIED'],
+      ['Total Tracks',   sum.total_tracks   ?? '--'],
+      ['Air Tracks',     sum.air_tracks     ?? '--'],
+      ['Sea Tracks',     sum.sea_tracks     ?? '--'],
+      ['Active Threats', sum.active_threats ?? '--'],
+      ['Emergencies',    sum.active_emergencies ?? '--'],
+      ['Unack. Alerts',  sum.unacknowledged_alerts ?? '--'],
+      ['Watchlist',      sum.watchlist_entries ?? '--'],
+    ];
+    for (const [k, v] of kvs) {
+      html += `<div class="sitrep-kv">
+        <span class="sitrep-k">${k}</span>
+        <span class="sitrep-v">${escH(String(v))}</span>
+      </div>`;
+    }
+    html += '</div>';
+
+    // Air picture
+    if (s.air_picture) {
+      html += `<div class="sitrep-section">
+        <div class="sitrep-heading">AIR PICTURE (${s.air_picture.total ?? 0} tracks)</div>`;
+      const ba = s.air_picture.by_affiliation || {};
+      for (const [aff, cnt] of Object.entries(ba)) {
+        if (cnt > 0) html += `<div class="sitrep-kv">
+          <span class="sitrep-k">${aff}</span>
+          <span class="sitrep-v">${cnt}</span></div>`;
+      }
+      html += '</div>';
+    }
+
+    // Sea picture
+    if (s.sea_picture) {
+      html += `<div class="sitrep-section">
+        <div class="sitrep-heading">SEA PICTURE (${s.sea_picture.total ?? 0} tracks)</div>`;
+      const bs = s.sea_picture.by_affiliation || {};
+      for (const [aff, cnt] of Object.entries(bs)) {
+        if (cnt > 0) html += `<div class="sitrep-kv">
+          <span class="sitrep-k">${aff}</span>
+          <span class="sitrep-v">${cnt}</span></div>`;
+      }
+      html += '</div>';
+    }
+
+    // Threats
+    if (s.threats && s.threats.length > 0) {
+      html += `<div class="sitrep-section">
+        <div class="sitrep-heading">THREATS (${s.threats.length})</div>`;
+      for (const t of s.threats.slice(0, 10)) {
+        html += `<div class="sitrep-kv">
+          <span class="sitrep-k">${escH(t.callsign || t.id)}</span>
+          <span class="sitrep-v" style="color:var(--danger)">LVL ${t.threat_level} | ${(t.domain||'').toUpperCase()} | ${(t.affiliation||'').toUpperCase()}</span>
+        </div>`;
+      }
+      html += '</div>';
+    }
+
+    // Emergencies
+    if (s.emergencies && s.emergencies.length > 0) {
+      html += `<div class="sitrep-section">
+        <div class="sitrep-heading" style="color:var(--danger)">EMERGENCIES (${s.emergencies.length})</div>`;
+      for (const e of s.emergencies) {
+        html += `<div class="sitrep-kv">
+          <span class="sitrep-k">${escH(e.callsign || e.id)}</span>
+          <span class="sitrep-v" style="color:var(--danger)">SQUAWK ${escH(e.squawk)}</span>
+        </div>`;
+      }
+      html += '</div>';
+    }
+  }
+
+  // Narrative
+  if (n && n.narrative) {
+    html += `<div class="sitrep-section">
+      <div class="sitrep-heading">${(format || 'nato').toUpperCase()} NARRATIVE
+        ${n.llm_available ? '<span style="color:var(--success);font-size:8px;margin-left:6px;">LLM</span>' : '<span style="color:var(--text-dim);font-size:8px;margin-left:6px;">TEMPLATE</span>'}
+      </div>
+      <div class="sitrep-block">${escH(n.narrative)}</div>
+    </div>`;
+  }
+
+  if (!html) {
+    html = '<div class="nl-result error">No data available. Start the engine with live data sources.</div>';
+  }
+
+  body.innerHTML = html;
+}
+
+// ─────────────────────────────────────────────
+// NL QUERY
+// ─────────────────────────────────────────────
+let _nlLoading = false;
+
+function setNlExample(el) {
+  document.getElementById('nl-input').value = el.textContent.trim();
+}
+
+function nlKeydown(e) {
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) submitNlQuery();
+}
+
+function clearNlResult() {
+  document.getElementById('nl-result-wrap').innerHTML = '';
+  document.getElementById('nl-input').value = '';
+}
+
+async function submitNlQuery() {
+  if (_nlLoading) return;
+  const query = document.getElementById('nl-input').value.trim();
+  if (!query) { showNotice('Enter a query'); return; }
+
+  _nlLoading = true;
+  const btn = document.getElementById('btn-nl-submit');
+  const wrap = document.getElementById('nl-result-wrap');
+  btn.disabled = true;
+  btn.textContent = 'QUERYING...';
+  wrap.innerHTML = `<div class="sitrep-loading">
+    <div class="sitrep-spinner"></div><span>Processing query...</span>
+  </div>`;
+
+  try {
+    const resp = await fetch('/api/operator/query', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query }),
+    });
+    const data = resp.ok ? await resp.json() : null;
+
+    if (!data) throw new Error(`HTTP ${resp.status}`);
+    renderNlResult(data, query);
+  } catch (err) {
+    wrap.innerHTML = `<div class="nl-result error">Query failed: ${escH(err.message)}</div>`;
+  } finally {
+    _nlLoading = false;
+    btn.disabled = false;
+    btn.textContent = '▶ SUBMIT QUERY';
+  }
+}
+
+function renderNlResult(data, query) {
+  const wrap = document.getElementById('nl-result-wrap');
+  let html = '';
+
+  // Text answer
+  if (data.answer) {
+    html += `<div class="nl-result success">${escH(data.answer)}</div>`;
+  }
+
+  // Matched entities — highlight on map and list them
+  const entities = data.entities || data.results || [];
+  if (entities.length > 0) {
+    html += `<div class="form-label" style="margin-top:10px;margin-bottom:5px;">
+      MATCHED ENTITIES (${entities.length})
+    </div>`;
+    for (const e of entities.slice(0, 20)) {
+      const id = e.entity_id || e.id || '';
+      const name = e.callsign || e.name || id;
+      const aff = e.affiliation || 'unknown';
+      const affColor = aff === 'friendly' ? 'var(--friendly)' :
+                       aff === 'hostile'  ? 'var(--danger)' :
+                       aff === 'suspect'  ? 'var(--warning)' : 'var(--text-dim)';
+      html += `<div class="entity-result-item" onclick="highlightNlEntity('${escJ(id)}')">
+        <span style="width:6px;height:6px;border-radius:50%;background:${affColor};flex-shrink:0;"></span>
+        <span class="pb-track-id">${escH(name)}</span>
+        <span style="font-size:9px;color:var(--text-dim)">${(e.domain||'').toUpperCase()}</span>
+        <span style="font-size:9px;color:${affColor}">${(aff).toUpperCase()}</span>
+      </div>`;
+    }
+    // Highlight all matched entities on map
+    _highlightNlEntities(entities.map(e => e.entity_id || e.id).filter(Boolean));
+  }
+
+  if (!html) {
+    html = `<div class="nl-result" style="color:var(--text-dim)">No results for: "${escH(query)}"</div>`;
+  }
+
+  wrap.innerHTML = html;
+}
+
+function highlightNlEntity(id) {
+  if (!S.lastData) return;
+  const f = S.lastData.features.find(x => x.properties.id === id);
+  if (f) {
+    const [lng, lat] = f.geometry.coordinates;
+    map.flyTo({ center: [lng, lat], zoom: Math.max(map.getZoom(), 8), duration: 800 });
+    showDetail(f.properties);
+  }
+}
+
+function _highlightNlEntities(ids) {
+  // Flash highlight by temporarily modifying the selected filter
+  if (ids.length === 0) return;
+  // Use the first entity as the selected one for map highlight
+  if (ids.length === 1) {
+    map.setFilter('entity-selected', ['==', ['get', 'id'], ids[0]]);
+    S.selectedId = ids[0];
+  }
+}
+
+// ─────────────────────────────────────────────
+// PLAYBACK
+// ─────────────────────────────────────────────
+const PB = {
+  playing: true,
+  speed: 1,
+  frame: 100,           // 0-100 position in history
+  interval: null,
+  snapshot: null,       // frozen copy of lastData at playback start
+  historyFrames: [],    // array of {ts, positions: {id: {lng,lat,domain}}}
+};
+
+function pbInit() {
+  // Build frame array from current track history
+  PB.historyFrames = _buildPlaybackFrames();
+  PB.frame = PB.historyFrames.length > 0 ? PB.historyFrames.length - 1 : 0;
+  const slider = document.getElementById('pb-slider');
+  slider.max = Math.max(1, PB.historyFrames.length - 1);
+  slider.value = slider.max;
+  pbRenderFrame(PB.frame);
+  pbUpdateTrackList(PB.frame);
+
+  // Auto-play from start if we have frames
+  if (PB.historyFrames.length > 1 && PB.playing) {
+    pbStartPlay();
+  }
+}
+
+function _buildPlaybackFrames() {
+  // Collect all timestamps from track history, build sorted unique frame list
+  const allTs = new Set();
+  for (const hist of Object.values(S.trackHistory)) {
+    for (const pt of hist) allTs.add(pt.ts);
+  }
+  const sortedTs = [...allTs].sort();
+  if (sortedTs.length === 0) return [];
+
+  // For each timestamp, build a snapshot of known positions
+  const frames = [];
+  for (const ts of sortedTs) {
+    const positions = {};
+    for (const [id, hist] of Object.entries(S.trackHistory)) {
+      // Find the latest position at or before this ts
+      let best = null;
+      for (const pt of hist) {
+        if (pt.ts <= ts) best = pt;
+      }
+      if (best) {
+        // Get domain from lastData
+        const feat = S.lastData && S.lastData.features.find(f => f.properties.id === id);
+        positions[id] = {
+          lng: best.lng, lat: best.lat,
+          domain: feat ? feat.properties.domain : 'unknown',
+          callsign: feat ? feat.properties.callsign : id,
+          affiliation: feat ? feat.properties.affiliation : 'unknown',
+        };
+      }
+    }
+    frames.push({ ts, positions });
+  }
+  return frames;
+}
+
+function pbRenderFrame(frameIdx) {
+  const frames = PB.historyFrames;
+  if (frames.length === 0) return;
+  const f = frames[Math.min(frameIdx, frames.length - 1)];
+  const d = new Date(f.ts);
+  const hh = String(d.getUTCHours()).padStart(2,'0');
+  const mm = String(d.getUTCMinutes()).padStart(2,'0');
+  const ss = String(d.getUTCSeconds()).padStart(2,'0');
+  document.getElementById('pb-time-display').textContent = `${hh}:${mm}:${ss} UTC`;
+  document.getElementById('pb-slider').value = frameIdx;
+}
+
+function pbUpdateTrackList(frameIdx) {
+  const frames = PB.historyFrames;
+  if (frames.length === 0) {
+    document.getElementById('pb-track-list').innerHTML =
+      '<div style="font-size:9px;color:var(--text-dim);padding:8px 0;">No track history yet — data accumulates as the live feed runs.</div>';
+    document.getElementById('pb-track-count').textContent = '0 entities';
+    return;
+  }
+  const f = frames[Math.min(frameIdx, frames.length - 1)];
+  const entries = Object.entries(f.positions);
+  document.getElementById('pb-track-count').textContent = `${entries.length} entities at T`;
+
+  const domainColor = d => d === 'air' ? '#4FC3F7' : d === 'sea' ? '#66BB6A' : d === 'drone' ? '#7c4dff' : '#78909C';
+  let html = '';
+  for (const [id, p] of entries.slice(0, 40)) {
+    html += `<div class="pb-track-item">
+      <div class="pb-track-dot" style="background:${domainColor(p.domain)}"></div>
+      <span class="pb-track-id">${escH(p.callsign || id)}</span>
+      <span class="pb-track-pos">${p.lat.toFixed(3)},${p.lng.toFixed(3)}</span>
+    </div>`;
+  }
+  if (entries.length > 40) {
+    html += `<div style="font-size:9px;color:var(--text-dim);padding:4px 6px;">+${entries.length - 40} more</div>`;
+  }
+  document.getElementById('pb-track-list').innerHTML = html;
+}
+
+function scrubPlayback(val) {
+  PB.frame = parseInt(val);
+  if (PB.interval) pbStopPlay();
+  pbRenderFrame(PB.frame);
+  pbUpdateTrackList(PB.frame);
+}
+
+function pbTogglePlay() {
+  if (PB.playing) {
+    pbStopPlay();
+  } else {
+    pbStartPlay();
+  }
+}
+
+function pbStartPlay() {
+  PB.playing = true;
+  const btn = document.getElementById('pb-play-btn');
+  if (btn) { btn.textContent = '⏸ PAUSE'; btn.classList.add('active'); }
+  if (PB.interval) clearInterval(PB.interval);
+  PB.interval = setInterval(() => {
+    if (PB.frame >= PB.historyFrames.length - 1) {
+      pbStopPlay();
+      return;
+    }
+    PB.frame++;
+    pbRenderFrame(PB.frame);
+    pbUpdateTrackList(PB.frame);
+  }, Math.round(400 / PB.speed));
+}
+
+function pbStopPlay() {
+  PB.playing = false;
+  const btn = document.getElementById('pb-play-btn');
+  if (btn) { btn.textContent = '▶ PLAY'; btn.classList.remove('active'); }
+  if (PB.interval) { clearInterval(PB.interval); PB.interval = null; }
+}
+
+function pbSetSpeed(v) {
+  PB.speed = parseFloat(v);
+  if (PB.playing) { pbStopPlay(); pbStartPlay(); }
+}
+
+function pbStepBack() {
+  pbStopPlay();
+  PB.frame = Math.max(0, PB.frame - 1);
+  pbRenderFrame(PB.frame);
+  pbUpdateTrackList(PB.frame);
+}
+
+function pbStepForward() {
+  pbStopPlay();
+  PB.frame = Math.min(PB.historyFrames.length - 1, PB.frame + 1);
+  pbRenderFrame(PB.frame);
+  pbUpdateTrackList(PB.frame);
+}
+
+function pbReset() {
+  pbStopPlay();
+  PB.historyFrames = _buildPlaybackFrames();
+  PB.frame = 0;
+  const slider = document.getElementById('pb-slider');
+  slider.max = Math.max(1, PB.historyFrames.length - 1);
+  slider.value = 0;
+  pbRenderFrame(0);
+  pbUpdateTrackList(0);
+}
 </script>
 </body>
 </html>

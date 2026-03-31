@@ -12,12 +12,20 @@ import pytest
 from fastapi.testclient import TestClient
 
 from mpe.server import app
+from mpe.auth import CurrentUser, require_operator, require_viewer
 import mpe.operator_api as operator_api
 
 
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
+def _fake_operator() -> CurrentUser:
+    return CurrentUser(username="test_operator", role="operator")
+
+
+def _fake_viewer() -> CurrentUser:
+    return CurrentUser(username="test_viewer", role="viewer")
 
 
 @pytest.fixture(autouse=True)
@@ -26,10 +34,14 @@ def _clear_state():
     operator_api._watchlist.clear()
     operator_api._classification_overrides.clear()
     operator_api._alert_history.clear()
+    # Override auth dependencies so tests don't need real JWT tokens
+    app.dependency_overrides[require_operator] = _fake_operator
+    app.dependency_overrides[require_viewer] = _fake_viewer
     yield
     operator_api._watchlist.clear()
     operator_api._classification_overrides.clear()
     operator_api._alert_history.clear()
+    app.dependency_overrides.clear()
 
 
 @pytest.fixture()

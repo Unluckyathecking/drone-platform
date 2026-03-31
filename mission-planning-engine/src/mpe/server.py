@@ -13,6 +13,7 @@ Run: uvicorn mpe.server:app --reload --port 8080
 
 from __future__ import annotations
 
+import asyncio
 import json
 import math
 import random
@@ -22,8 +23,9 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.error import URLError
+from typing import Set
 
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
 
@@ -34,8 +36,10 @@ from mpe.classifier import EntityClassifier
 from mpe.adsb_types import adsb_category_to_cot
 from mpe.ais_types import ais_type_to_cot
 from mpe.operator_api import router as operator_router
+from mpe.auth import router as auth_router
 
 app = FastAPI(title="MPE C2 Dashboard", version="0.3.0")
+app.include_router(auth_router)
 app.include_router(operator_router)
 
 # CORS for local dev
@@ -1001,3 +1005,102 @@ async def serve_dashboard():
         "<h1>MPE C2 Dashboard</h1>"
         "<p>Dashboard not found. Place index.html in dashboard/</p>"
     )
+
+
+# ---------------------------------------------------------------------------
+# WebSocket — real-time track push
+# ---------------------------------------------------------------------------
+
+_ws_clients: Set[WebSocket] = set()
+
+
+async def _ws_broadcast_loop() -> None:
+    """Background task: push track updates to all connected WebSocket clients."""
+    while True:
+        await asyncio.sleep(4)
+        if not _ws_clients:
+            continue
+        try:
+            aircraft = await get_aircraft()
+            vessels = await get_vessels()
+            drone_features = _build_drone_features()
+            combined = aircraft["features"] + vessels["features"] + drone_features
+            threat_count = sum(
+                1 for f in combined
+                if isinstance(f["properties"].get("threat_level"), int)
+                and f["properties"]["threat_level"] >= 4
+            )
+            payload = json.dumps({
+                "type": "tracks",
+                "data": {
+                    "type": "FeatureCollection",
+                    "features": combined,
+                    "meta": {
+                        "aircraft": aircraft["meta"]["count"],
+                        "vessels": vessels["meta"]["count"],
+                        "drones": len(drone_features),
+                        "threats": threat_count,
+                        "total": len(combined),
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                    },
+                },
+            })
+        except Exception:
+            continue
+
+        dead: Set[WebSocket] = set()
+        for ws in list(_ws_clients):
+            try:
+                await ws.send_text(payload)
+            except Exception:
+                dead.add(ws)
+        _ws_clients.difference_update(dead)
+
+
+@app.on_event("startup")
+async def _start_ws_broadcast() -> None:
+    asyncio.create_task(_ws_broadcast_loop())
+
+
+@app.websocket("/ws/tracks")
+async def websocket_tracks(websocket: WebSocket) -> None:
+    """WebSocket endpoint for real-time track streaming.
+
+    On connect: immediately sends current track snapshot.
+    Then the broadcast loop pushes updates every 4 seconds.
+    """
+    await websocket.accept()
+    _ws_clients.add(websocket)
+    try:
+        # Send immediate snapshot on connect
+        aircraft = await get_aircraft()
+        vessels = await get_vessels()
+        drone_features = _build_drone_features()
+        combined = aircraft["features"] + vessels["features"] + drone_features
+        threat_count = sum(
+            1 for f in combined
+            if isinstance(f["properties"].get("threat_level"), int)
+            and f["properties"]["threat_level"] >= 4
+        )
+        await websocket.send_text(json.dumps({
+            "type": "tracks",
+            "data": {
+                "type": "FeatureCollection",
+                "features": combined,
+                "meta": {
+                    "aircraft": aircraft["meta"]["count"],
+                    "vessels": vessels["meta"]["count"],
+                    "drones": len(drone_features),
+                    "threats": threat_count,
+                    "total": len(combined),
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                },
+            },
+        }))
+        # Keep connection alive — client messages are ignored (receive-only)
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        pass
+    finally:
+        _ws_clients.discard(websocket)
