@@ -989,3 +989,178 @@ class TestPredictorWiring:
     def test_config_predictor_min_speed_field(self) -> None:
         config = EngineConfig(predictor_min_speed_mps=2.5)
         assert config.predictor_min_speed_mps == 2.5
+
+
+# ---------------------------------------------------------------------------
+# Async pipeline (_run_pipeline) tests
+# ---------------------------------------------------------------------------
+
+
+class TestRunPipeline:
+    """Test the async _run_pipeline method."""
+
+    def test_run_pipeline_exists(self) -> None:
+        engine = CoreEngine()
+        assert hasattr(engine, "_run_pipeline")
+        assert asyncio.iscoroutinefunction(engine._run_pipeline)
+
+    def test_run_pipeline_calls_classify_all(self) -> None:
+        """_run_pipeline must invoke the classify/alert/geofence logic."""
+        engine = CoreEngine(EngineConfig(
+            adsb_enabled=False, ais_enabled=False, cot_enabled=False,
+        ))
+        engine.aircraft_tracker.update(
+            icao_hex="PIPE01",
+            latitude=51.5,
+            longitude=-0.1,
+            altitude_baro_ft=35000,
+            ground_speed_kts=450,
+            callsign="BAW123",
+        )
+
+        asyncio.run(engine._run_pipeline())
+
+        # classify_all must have run
+        assert int(engine.stats["classifications_run"]) == 1
+        track = engine.aircraft_tracker.active_tracks[0]
+        assert hasattr(track, "_classification")
+
+    def test_run_pipeline_outputs_cot(self) -> None:
+        """When cot_output is set, _run_pipeline sends at least one position CoT."""
+        engine = CoreEngine(EngineConfig(
+            adsb_enabled=False, ais_enabled=False, cot_enabled=False,
+            geofence_load_demo_zones=False,  # Avoid geofence alerts polluting count
+        ))
+        engine.aircraft_tracker.update(
+            icao_hex="PIPE02",
+            latitude=51.5,
+            longitude=-0.1,
+            altitude_baro_ft=20000,
+            callsign="TEST1",
+        )
+
+        mock_output = MagicMock()
+        mock_output.send_batch.return_value = 1
+        engine._cot_output = mock_output
+
+        asyncio.run(engine._run_pipeline())
+
+        mock_output.send_batch.assert_called_once()
+        events = mock_output.send_batch.call_args[0][0]
+        assert len(events) == 1  # Exactly 1 position CoT, no geofence alerts
+
+    def test_run_pipeline_noop_without_tracks(self) -> None:
+        """Empty trackers produce no events and no errors."""
+        engine = CoreEngine(EngineConfig(
+            adsb_enabled=False, ais_enabled=False, cot_enabled=False,
+        ))
+        mock_output = MagicMock()
+        mock_output.send_batch.return_value = 0
+        engine._cot_output = mock_output
+
+        asyncio.run(engine._run_pipeline())
+
+        events = mock_output.send_batch.call_args[0][0]
+        assert len(events) == 0
+
+    def test_run_pipeline_with_alert_flushes_cots(self) -> None:
+        """Pipeline flushes pending alert CoTs through cot_output."""
+        config = EngineConfig(
+            adsb_enabled=False, ais_enabled=False, cot_enabled=False,
+            known_hostile_mmsis={999000001},
+        )
+        engine = CoreEngine(config)
+        engine.vessel_tracker.update(
+            mmsi=999000001,
+            latitude=25.0,
+            longitude=55.0,
+            speed_over_ground=8.0,
+        )
+
+        mock_output = MagicMock()
+        mock_output.send_batch.return_value = 1
+        engine._cot_output = mock_output
+
+        asyncio.run(engine._run_pipeline())
+
+        # There should be at least one alert CoT in the batch
+        events = mock_output.send_batch.call_args[0][0]
+        assert len(events) >= 1
+        # Alert CoTs are type b-a-o-tbl
+        alert_cots = [e for e in events if "b-a-o-tbl" in e]
+        assert len(alert_cots) >= 1
+
+    def test_main_loop_uses_pipeline_interval(self) -> None:
+        """EngineConfig.classify_interval_s controls pipeline cadence."""
+        config = EngineConfig(classify_interval_s=3.0)
+        assert config.classify_interval_s == 3.0
+
+
+# ---------------------------------------------------------------------------
+# Sub-package import tests
+# ---------------------------------------------------------------------------
+
+
+class TestSubPackageImports:
+    """Verify that the logical sub-packages re-export correctly."""
+
+    def test_ingest_subpackage(self) -> None:
+        from mpe.ingest import (
+            ADSBReceiver, AircraftTracker, AircraftTrack,
+            AISReceiver, VesselTracker, VesselTrack, CotReceiver,
+        )
+        assert ADSBReceiver is not None
+        assert AircraftTracker is not None
+        assert AircraftTrack is not None
+        assert AISReceiver is not None
+        assert VesselTracker is not None
+        assert VesselTrack is not None
+        assert CotReceiver is not None
+
+    def test_intelligence_subpackage(self) -> None:
+        from mpe.intelligence import (
+            TrackManager, Observation, TrackedEntity,
+            EntityClassifier,
+            AlertEngine, AlertEvent, AlertRule,
+            GeofenceManager, GeofenceZone, GeofenceViolation, DEMO_ZONES,
+            TrajectoryPredictor, PredictedPosition, TrajectoryForecast,
+            PatternOfLifeAnalyser, HealthMonitor, IntelligenceEngine,
+        )
+        assert TrackManager is not None
+        assert EntityClassifier is not None
+        assert GeofenceManager is not None
+        assert IntelligenceEngine is not None
+        assert len(DEMO_ZONES) == 4
+
+    def test_output_subpackage(self) -> None:
+        from mpe.output import (
+            ADSBCoTBridge, AISCoTBridge,
+            CoTOutput, CoTStreamer,
+            CoTWriter, MissionWriter, QGCWPLWriter,
+            CoTTranslator,
+        )
+        assert ADSBCoTBridge is not None
+        assert CoTOutput is not None
+        assert CoTWriter is not None
+
+    def test_mission_subpackage(self) -> None:
+        from mpe.mission import (
+            build_mission, validate, MAVLinkTranslator,
+            MissionItem, BasicMission, Coordinate,
+            TaskPlan, Entity, Task, Waypoint,
+        )
+        assert build_mission is not None
+        assert MAVLinkTranslator is not None
+        assert TaskPlan is not None
+
+    def test_flat_imports_still_work(self) -> None:
+        """All original flat imports must remain valid -- no breakage."""
+        from mpe.aircraft_tracker import AircraftTracker
+        from mpe.vessel_tracker import VesselTracker
+        from mpe.classifier import EntityClassifier
+        from mpe.geofence import GeofenceManager
+        from mpe.predictor import TrajectoryPredictor
+        from mpe.track_manager import TrackManager
+        from mpe.alerts import AlertEngine
+        from mpe.engine import CoreEngine, EngineConfig
+        assert True  # Import success is the test

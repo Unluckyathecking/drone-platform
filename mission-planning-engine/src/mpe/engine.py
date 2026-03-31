@@ -334,33 +334,28 @@ class CoreEngine:
 
         # Main loop
         logger.info("Engine running. Press Ctrl+C to stop.")
-        last_classify = 0.0
-        last_output = 0.0
+        last_pipeline = 0.0
         last_purge = 0.0
 
         try:
             while self._running:
                 now = time.monotonic()
 
-                # Classify
-                if now - last_classify >= self._config.classify_interval_s:
-                    self._classify_all()
+                # Async pipeline: ingest snapshot → classify → geofence →
+                # predict → alert → CoT output.  All CPU work runs in the
+                # thread pool so the event loop stays responsive.
+                if now - last_pipeline >= self._config.classify_interval_s:
+                    await self._run_pipeline()
                     await self._flush_db_ops()
-                    last_classify = now
-
-                # Output CoT
-                if now - last_output >= self._config.output_interval_s:
-                    self._output_cot()
-                    last_output = now
+                    last_pipeline = now
 
                 # Purge stale
                 if now - last_purge >= self._config.purge_interval_s:
                     self._purge_stale()
-                    # FIX #1: Also purge stale entities from TrackManager
                     self._track_manager.purge_stale()
                     last_purge = now
 
-                # FIX #1: Check health of ingest sources
+                # Check health of ingest sources
                 health_alerts = self._health_monitor.check()
                 for ha in health_alerts:
                     logger.warning(
@@ -530,6 +525,24 @@ class CoreEngine:
             )
 
         self._pending_db_ops.append(persist_alert)
+
+    # -- async pipeline -----------------------------------------------------
+
+    async def _run_pipeline(self) -> None:
+        """Full ingest → classify → geofence → predict → alert → CoT pipeline.
+
+        CPU-bound work (classify, geofence, predict) runs in the default
+        thread-pool executor via asyncio.to_thread so the event loop is not
+        blocked.  CoT output (socket send) runs inline -- it is fast and
+        already non-blocking at the OS level for UDP.
+        """
+        # Offload the entire CPU-bound classify/alert/geofence/predict pass
+        # to a worker thread.  _classify_all is pure CPU + in-memory state;
+        # it acquires no async resources, so thread-pool execution is safe.
+        await asyncio.to_thread(self._classify_all)
+
+        # CoT output is socket I/O -- fast, runs inline on the event loop.
+        self._output_cot()
 
     # -- periodic tasks -----------------------------------------------------
 
